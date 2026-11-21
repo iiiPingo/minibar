@@ -208,7 +208,7 @@ namespace Minibar
             var c = Content;
             var p = new Panel { Location = c.Location, Size = c.Size, BackColor = Theme.Bg, Visible = false, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
             p.Controls.Add(new Label { Text = title, Font = fTitle, ForeColor = Theme.Text, AutoSize = true, Location = new Point(0, 0), BackColor = Theme.Bg });
-            sub = new Label { Text = subtitle ?? "", Font = fSmall, ForeColor = Theme.Sub, AutoSize = false, Size = new Size(c.Width, S(20)), Location = new Point(0, S(36)), BackColor = Theme.Bg, UseMnemonic = false, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            sub = new Label { Text = subtitle ?? "", Font = fSmall, ForeColor = Theme.Sub, AutoSize = false, Size = new Size(c.Width, S(28)), Location = new Point(0, S(39)), AutoEllipsis = true, BackColor = Theme.Bg, UseMnemonic = false, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             p.Controls.Add(sub);
             Controls.Add(p);
             pagePanels.Add(p);
@@ -240,7 +240,9 @@ namespace Minibar
             p.AutoScroll = true;
             Ux.Dark(p);
             int y = S(70), w = p.Width;
-            Lbl(p, "Accent colour", 0, y, S(120), S(36), Theme.Text, fBody).TextAlign = ContentAlignment.MiddleLeft;
+            var accL = Lbl(p, "Accent colour", 0, y, S(120), S(36), Theme.Text, fBody);
+            accL.TextAlign = ContentAlignment.MiddleLeft;
+            accL.Anchor = AnchorStyles.Top | AnchorStyles.Left;   // stretching with the window made it cover the swatches
             var sw = new SwatchRow(s) { Location = new Point(S(120), y), Width = w - S(120), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             Theme.TryHex(st.Accent, out var cur);
             sw.Value = st.Accent.Length == 0 ? Theme.DefaultAccent : cur;
@@ -252,6 +254,7 @@ namespace Minibar
                 RefreshAll(this);
             };
             p.Controls.Add(sw);
+            sw.BringToFront();
             y += S(60);
 
             var trayT = new Toggle("Minimize to tray", s) { Location = new Point(0, y), Width = w, Hint = "Minimizing hides Minibar to a tray icon. The icon is only there while it's hidden.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };

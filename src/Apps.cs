@@ -32,7 +32,7 @@ namespace Minibar
 
         public static readonly AppDef[] All =
         {
-            new AppDef { Name = "Echoa", Blurb = "Volume mixer", RunName = "Echoa", DataDir = e => Roam("Echoa"), Highlights = "One click sets the default output  \u00b7  remembers each app's volume  \u00b7  stops the SteelSeries taking over", Repos = new[] { "echoa", "sip" }, ExitSince = new Version(1, 6) },
+            new AppDef { Name = "Echoa", Blurb = "Volume mixer", RunName = "Echoa", DataDir = e => Roam("Echoa"), Highlights = "One click sets the default output  \u00b7  remembers each app's volume  \u00b7  quick mic mute", Repos = new[] { "echoa", "sip" }, ExitSince = new Version(1, 6) },
             new AppDef
             {
                 Name = "Juice", Blurb = "Battery levels", RunName = "Juice", RunArgs = "--autostart", LogName = "juice.log",
@@ -53,10 +53,10 @@ namespace Minibar
                        "\u2022  Xbox (over Bluetooth) and GameSir controllers\n\n" +
                        "Not yet: Razer, Corsair, HyperX and other brands' own USB receivers. Right-click Juice > Diagnostics shows everything it can see."
             },
-            new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists  \u00b7  keeps yt-dlp up to date", Repos = new[] { "pour" }, ExitSince = new Version(1, 2) },
+            new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists", Repos = new[] { "pour" }, ExitSince = new Version(1, 2) },
             new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3) },
             // Fizz last: its card can carry the PawnIO / anti-cheat notice
-            new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  click-through  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1) },
+            new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1) },
         };
 
         public static readonly AppDef Minibar = new AppDef { Name = "Minibar", Blurb = "This app", Self = true, DataDir = e => Settings.Dir, Repos = new[] { "minibar" } };

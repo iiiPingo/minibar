@@ -10,7 +10,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>1.6.2</Version>
+    <Version>1.6.3</Version>
     <Product>Minibar</Product>
     <Description>Minibar - home for the drink apps</Description>
     <DebugType>none</DebugType>

@@ -1,4 +1,4 @@
-MINIBAR 1.6.2
+MINIBAR 1.6.3
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 OPEN IT
@@ -73,6 +73,12 @@ FILES
                                  release seen on GitHub)
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
+
+NEW IN 1.6.3
+- The line under the title on Apps and Updates is no longer cut off at the bottom.
+- The accent colours in Settings stay visible when you make the window wider.
+- Simpler highlights on the cards: Fizz "easy to customize", Echoa "quick mic mute",
+  Pour without the yt-dlp line.
 
 NEW IN 1.6.2
 - Apps that aren't installed show their real logo (a little faded) instead of a letter,
