@@ -640,7 +640,7 @@ namespace Minibar
                 int found = apps.Count(a => a.Found), running = apps.Count(a => a.Running);
                 appsSub.Text = found == 0 ? "None of your apps are on this PC yet. Press Install on a card to get one from GitHub."
                     : running + " of " + found + " running"
-                      + (found < apps.Count ? "  ·  " + (apps.Count - found) + " not found" : "");
+                      + (found < apps.Count ? "  ·  " + (apps.Count - found) + " not installed" : "");
                 list.Invalidate();
                 if (page == 1) { ulist.Invalidate(); UpdateCheckedText(); }
             }

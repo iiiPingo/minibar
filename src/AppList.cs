@@ -118,14 +118,15 @@ namespace Minibar
             var ir = new Rectangle(x0, top + S(18), S(44), S(44));
             for (int i = 3; i >= 1; i--)
                 Theme.Fill(g, new RectangleF(ir.X - i * 0.5f, ir.Y + S(2) + i * 0.6f, ir.Width + i, ir.Height + i * 0.4f), Color.FromArgb(18, 0, 0, 0), S(11) + i);
-            if (a.Found && (a.Icon == null || a.IconFor != ir.Width || a.IconPath != a.Exe))
+            string iconKey = a.Exe ?? "builtin";
+            if (a.Icon == null || a.IconFor != ir.Width || a.IconPath != iconKey)
             {
                 a.Icon?.Dispose();
-                a.Icon = Native.ExeIcon(a.Exe, ir.Width);
+                a.Icon = (a.Found ? Native.ExeIcon(a.Exe, ir.Width) : null) ?? Native.BuiltInIcon(a.Def.Name, ir.Width);
                 a.IconFor = ir.Width;
-                a.IconPath = a.Exe;
+                a.IconPath = iconKey;
             }
-            if (a.Found && a.Icon != null) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.DrawImage(a.Icon, ir); }
+            if (a.Icon != null) Theme.DrawIcon(g, a.Icon, ir, a.Found ? 1f : 0.6f);   // not installed yet: a little faded
             else
             {
                 Theme.Fill(g, ir, Theme.Field, S(11));
@@ -137,7 +138,7 @@ namespace Minibar
             int nw = TextW(g, a.Def.Name, fName) + S(2);
             TextRenderer.DrawText(g, a.Def.Name, fName, new Rectangle(nx, top + S(16), nw, S(26)), Theme.Text, Ux.L);
             string state; Color pillBg, dot, stc; bool hollow = false;
-            if (!a.Found) { state = "Not found"; pillBg = Color.FromArgb(52, 52, 52); dot = Theme.Dim; stc = Theme.Sub; hollow = true; }
+            if (!a.Found) { state = "Not installed"; pillBg = Color.FromArgb(52, 52, 52); dot = Theme.Dim; stc = Theme.Sub; hollow = true; }
             else if (a.Running) { state = "Running" + (a.Since != null ? "  ·  " + Uptime(DateTime.Now - a.Since.Value) : ""); pillBg = Color.FromArgb(34, Theme.Accent); dot = Theme.Accent; stc = Theme.Text; }
             else { state = "Not running"; pillBg = Color.FromArgb(52, 52, 52); dot = Theme.Sub; stc = Theme.Sub; hollow = true; }
             int pw = TextW(g, state, fPill) + S(30);

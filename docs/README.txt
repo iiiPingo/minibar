@@ -1,4 +1,4 @@
-MINIBAR 1.6.1
+MINIBAR 1.6.2
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 OPEN IT
@@ -11,7 +11,7 @@ OPEN IT
   The icon only exists while Minibar is hidden. Off by default.
 
 EACH APP CARD
-- Status: Running (and for how long), Not running, or Not found (with an Install button).
+- Status: Running (and for how long), Not running, or Not installed (with an Install button).
 - Version of the exe Minibar found, and a line on what the app is best at.
 - Start / Stop. Stop closes the app and anything it started (Pour's downloads,
   Fizz's PresentMon) and clears its tray icon. Fizz runs as admin, so stopping it
@@ -73,6 +73,10 @@ FILES
                                  release seen on GitHub)
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
+
+NEW IN 1.6.2
+- Apps that aren't installed show their real logo (a little faded) instead of a letter,
+  and say "Not installed" instead of "Not found".
 
 NEW IN 1.6.1
 - Minibar.exe works on its own (no zip needed, e.g. sent over Discord). If it sits

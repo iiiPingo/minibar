@@ -148,6 +148,30 @@ namespace Minibar
             catch { return bmp; }
         }
 
+        // the app's logo built into Minibar, for apps that aren't installed yet (no exe to take it from)
+        public static Bitmap BuiltInIcon(string app, int size)
+        {
+            try
+            {
+                using (var st = typeof(Native).Assembly.GetManifestResourceStream("appicon." + app + ".png"))
+                {
+                    if (st == null) return null;
+                    using (var src = new Bitmap(st))
+                    {
+                        var outb = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                        using (var g = Graphics.FromImage(outb))
+                        {
+                            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                            g.DrawImage(src, new Rectangle(0, 0, size, size));
+                        }
+                        return outb;
+                    }
+                }
+            }
+            catch { return null; }
+        }
+
         // square box around the clearly visible pixels (alpha > 128), centred on them
         static Rectangle TileBounds(Bitmap b)
         {

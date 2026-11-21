@@ -70,7 +70,7 @@ namespace Minibar
 
             var ir = new Rectangle(r.X + S(18), r.Y + (r.Height - S(36)) / 2, S(36), S(36));
             if (a.Def.Self) Theme.DrawLogo(g, ir);
-            else if (a.Found && a.Icon != null) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.DrawImage(a.Icon, ir); }
+            else if (a.Icon != null) Theme.DrawIcon(g, a.Icon, ir, a.Found ? 1f : 0.6f);
             else { Theme.Fill(g, ir, Theme.Field, S(9)); TextRenderer.DrawText(g, a.Def.Name.Substring(0, 1), fLetter, ir, Theme.Sub, Ux.C); }
 
             int x = ir.Right + S(16);
@@ -88,7 +88,7 @@ namespace Minibar
                 case UpdState.NoVersion: pill = "No version number"; break;
                 case UpdState.NotOnGitHub: pill = "Not on GitHub yet"; break;
                 case UpdState.Problem: pill = "Couldn't check"; break;
-                default: pill = a.Found ? "Not checked yet" : "Not found"; break;
+                default: pill = a.Found ? "Not checked yet" : "Not installed"; break;
             }
             int pw = TextW(g, pill, fPill) + S(22);
             var pr = new Rectangle(x + nw + S(10), r.Y + S(18), pw, S(22));
@@ -140,7 +140,7 @@ namespace Minibar
                 right -= Chip(g, a, "notes", "What's new", right, cy) + S(4);
 
             // second line: what you have and what GitHub has (or the problem)
-            string have = !a.Found ? "Not found on this PC" : a.Version != null ? "You have v" + a.Version : "Your copy has no version number";
+            string have = !a.Found ? "Not installed on this PC" : a.Version != null ? "You have v" + a.Version : "Your copy has no version number";
             if (a.Def.Name == "Juice" && a.Found && a.Version == null && a.Rel?.Tag != null) have = "No version number yet, so Minibar can't compare";
             string gh;
             if (a.Error != null && DateTime.Now < a.ErrorUntil) gh = null;

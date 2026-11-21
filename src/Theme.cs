@@ -82,6 +82,17 @@ namespace Minibar
             try { using (var f = new Font(name, 10)) return f.Name == name; } catch { return false; }
         }
 
+        public static void DrawIcon(Graphics g, Image img, Rectangle r, float opacity)
+        {
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            if (opacity >= 0.999f) { g.DrawImage(img, r); return; }
+            using (var ia = new System.Drawing.Imaging.ImageAttributes())
+            {
+                ia.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = opacity });
+                g.DrawImage(img, r, 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, ia);
+            }
+        }
+
         public static GraphicsPath Round(RectangleF r, float rad)
         {
             var p = new GraphicsPath();
