@@ -257,6 +257,66 @@ namespace Minibar
                 .Where(r => !Keep(r)).ToList();
         }
 
+        // ------------------------------------------------------------ first install (an app that isn't on this PC yet)
+        // Goes next to Minibar's own folder (Downloads\Minibar -> Downloads\Pulp), where Minibar looks anyway;
+        // if that folder can't be written, %LOCALAPPDATA%\Programs\<App>. Returns the new exe.
+        public static string InstallNew(AppDef d, Release rel, string selfExe, Action<string> progress)
+        {
+            progress("Asking GitHub…");
+            if (rel?.AssetUrl == null) rel = Check(d);
+            if (rel?.AssetUrl == null)
+                throw new Exception(rel?.Problem == "missing" ? d.Name + " has no download on GitHub yet." : "Couldn't reach GitHub. Are you online?");
+            lock (installGate)
+            {
+                string work = Path.Combine(Root, "updates", d.Name + "-new-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+                try
+                {
+                    if (Directory.Exists(work)) Directory.Delete(work, true);
+                    Directory.CreateDirectory(work);
+                    string payload = Prepare(d, rel, work, progress);
+                    progress("Installing…");
+                    string dir = InstallDir(d, selfExe);
+                    foreach (var relPath in Files(payload))
+                    {
+                        string dest = Path.Combine(dir, relPath);
+                        Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                        if (Keep(relPath) && File.Exists(dest)) continue;
+                        CopyRetry(Path.Combine(payload, relPath), dest);
+                    }
+                    string exe = Path.Combine(dir, d.Name + ".exe");
+                    if (!File.Exists(exe)) throw new Exception("Something went wrong copying " + d.Name + ".");
+                    return exe;
+                }
+                finally { try { if (Directory.Exists(work)) Directory.Delete(work, true); } catch { } }
+            }
+        }
+
+        static string InstallDir(AppDef d, string selfExe)
+        {
+            var tries = new List<string>();
+            try
+            {
+                string mine = Path.GetDirectoryName(selfExe ?? "");
+                string parent = string.IsNullOrEmpty(mine) ? null : Path.GetDirectoryName(mine);
+                if (!string.IsNullOrEmpty(parent)) tries.Add(Path.Combine(parent, d.Name));
+            }
+            catch { }
+            tries.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", d.Name));
+            foreach (var dir in tries)
+            {
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                    string probe = Path.Combine(dir, ".minibar-write-test");
+                    File.WriteAllText(probe, "");
+                    File.Delete(probe);
+                    return dir;
+                }
+                catch { }
+            }
+            throw new Exception("Minibar couldn't find a folder it may write to for " + d.Name + ".");
+        }
+
         // ------------------------------------------------------------ installing
         public static void Install(AppInfo a, Action<string> progress)
         {

@@ -6,6 +6,7 @@ One window for the drink apps: **Echoa**, **Fizz**, **Juice**, **Pour** and **Pu
 - Open each app's folder, data folder or log.
 - Updates page: checks each app's GitHub releases and updates it in one click (with a backup and rollback).
 - Back up and restore every app's settings in one zip.
+- Install button: anything not on this PC installs from GitHub in one click (so friends only need Minibar).
 - Fizz notice: what Fizz needs installed (PawnIO) and the anti-cheat note, with download links.
 
 ## Install

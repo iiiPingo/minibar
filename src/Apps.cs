@@ -213,6 +213,16 @@ namespace Minibar
             catch { }
             string dl = Path.Combine(Downloads, d.Name);
             if (Directory.Exists(dl)) Walk(dl, 2);
+            // where Minibar's Install puts apps: next to Minibar's folder, or %LOCALAPPDATA%\Programs\<App>
+            try
+            {
+                string parent = Path.GetDirectoryName(Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath));
+                string side = Path.Combine(parent, d.Name);
+                if (Directory.Exists(side) && !side.Equals(dl, StringComparison.OrdinalIgnoreCase)) Walk(side, 1);
+            }
+            catch { }
+            string progs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", d.Name);
+            if (Directory.Exists(progs)) Walk(progs, 1);
             return found;
         }
 

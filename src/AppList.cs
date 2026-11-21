@@ -190,7 +190,7 @@ namespace Minibar
             else
             {
                 // what the app is, then what it's best at (the exe's place is one click away under Folder)
-                string more = !a.Found ? "Not on this PC, or somewhere Minibar doesn't look. Use Locate to point at " + a.Def.Name + ".exe."
+                string more = !a.Found ? "Not on this PC yet. Install gets it from GitHub; already have it? Use Locate."
                     : a.OtherCopy != null ? "Running from another copy: " + a.OtherCopy
                     : a.Def.Highlights ?? "";
                 int bw = TextW(g, a.Def.Blurb, fSmall);
@@ -216,8 +216,14 @@ namespace Minibar
             int bx = x0;
             if (!a.Found)
             {
-                bx += Button(g, a, "locate", Theme.GSearch, "Locate…", bx, by, true) + S(8);
-                Chip(g, a, "rescan", Theme.GRefresh, "Look again", bx, by);
+                if (a.Busy != null) { bx += Button(g, a, "busy", null, a.Busy, bx, by, false, disabled: true) + S(8); }
+                else
+                {
+                    // Install: download it from GitHub and set it up (for friends who only downloaded Minibar)
+                    bx += Button(g, a, "install", "\uE896", "Install", bx, by, true) + S(8);
+                    bx += Chip(g, a, "locate", Theme.GSearch, "Locate…", bx, by) + S(4);
+                    Chip(g, a, "rescan", Theme.GRefresh, "Look again", bx, by);
+                }
             }
             else
             {

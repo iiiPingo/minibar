@@ -380,6 +380,47 @@ namespace Minibar
             });
         }
 
+        // an app that isn't on this PC: download it from GitHub, put it next to Minibar, start it (Fizz waits for its notice)
+        void InstallNew(AppInfo a)
+        {
+            if (a.Found || a.Busy != null || a.Updating) return;
+            a.Updating = true;
+            a.Busy = "Waiting…";
+            a.Error = null;
+            list.Invalidate(); ulist.Invalidate();
+            string self = null;
+            try { self = Application.ExecutablePath; } catch { }
+            var rel = a.Rel;
+            var th = new System.Threading.Thread(() =>
+            {
+                Exception err = null;
+                string exe = null;
+                try { exe = Updater.InstallNew(a.Def, rel, self, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })); }
+                catch (Exception ex) { err = ex; Log.Crash(ex); }
+                Ui(() =>
+                {
+                    a.Busy = null;
+                    a.Updating = false;
+                    if (err != null) { Fail(a, err); list.Invalidate(); return; }
+                    st.Located[a.Def.Name] = exe;
+                    st.Save();
+                    Apps.Locate(a, st, null);
+                    a.Icon?.Dispose(); a.Icon = null;
+                    if (a.Def.Name != "Fizz")
+                    {
+                        try { Apps.Start(a, ""); } catch (Exception ex) { Log.Crash(ex); }
+                        a.Note = a.Def.Name + " is installed and running.";
+                    }
+                    else a.Note = "Fizz is installed. Read the note below, then press Start.";
+                    a.NoteUntil = DateTime.Now.AddSeconds(10); RepaintLater(10200);
+                    Rescan();
+                    UpdateForget();
+                    ulist.Invalidate();
+                });
+            }) { IsBackground = false, Name = "Minibar install " + a.Def.Name };
+            th.Start();
+        }
+
         // installs run on a foreground thread: closing Minibar mid-update still lets it finish (or undo) cleanly
         void StartInstall(AppInfo a)
         {
@@ -597,7 +638,7 @@ namespace Minibar
                     if (Updater.CanUpdate(a)) StartInstall(a); else a.Queued = false;
                 }
                 int found = apps.Count(a => a.Found), running = apps.Count(a => a.Running);
-                appsSub.Text = found == 0 ? "None of your apps were found yet. Use Locate on a card to point Minibar at one."
+                appsSub.Text = found == 0 ? "None of your apps are on this PC yet. Press Install on a card to get one from GitHub."
                     : running + " of " + found + " running"
                       + (found < apps.Count ? "  ·  " + (apps.Count - found) + " not found" : "");
                 list.Invalidate();
@@ -687,6 +728,7 @@ namespace Minibar
                     case "data": Apps.OpenFolder(a.DataDir); break;
                     case "log": Apps.OpenText(a.LogPath); break;
                     case "locate": PickExe(a); break;
+                    case "install": InstallNew(a); break;
                     case "rescan": Apps.Locate(a, st, null); Rescan(); if (a.Def.TaskName != null) QueryTasks(); if (!a.Found) Fail(a, new InvalidOperationException("Still not found. Use Locate to pick " + a.Def.Name + ".exe.")); break;
                     case "update": if (a.Queued) { a.Queued = false; list.Invalidate(); ulist.Invalidate(); } else StartInstall(a); break;
                     case "info": list.ToggleInfo(a); break;
