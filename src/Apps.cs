@@ -182,6 +182,16 @@ namespace Minibar
         }
 
         // <App>.exe under C:\Claude Projects (a few levels deep, backups and .old.exe skipped) and Downloads\<App>
+        // where installed apps go: beside Minibar's own folder when it has one (Downloads\Minibar -> Downloads\Pulp),
+        // otherwise beside the exe itself (Minibar.exe straight in Downloads -> Downloads\Pulp)
+        public static string AppsHome(string selfExe)
+        {
+            string mine = Path.GetDirectoryName(selfExe ?? "") ?? "";
+            if (Path.GetFileName(mine).Equals("Minibar", StringComparison.OrdinalIgnoreCase))
+                return Path.GetDirectoryName(mine) ?? mine;
+            return mine;
+        }
+
         static IEnumerable<string> Candidates(AppDef d)
         {
             var found = new List<string>();
@@ -216,8 +226,7 @@ namespace Minibar
             // where Minibar's Install puts apps: next to Minibar's folder, or %LOCALAPPDATA%\Programs\<App>
             try
             {
-                string parent = Path.GetDirectoryName(Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath));
-                string side = Path.Combine(parent, d.Name);
+                string side = Path.Combine(AppsHome(System.Windows.Forms.Application.ExecutablePath), d.Name);
                 if (Directory.Exists(side) && !side.Equals(dl, StringComparison.OrdinalIgnoreCase)) Walk(side, 1);
             }
             catch { }

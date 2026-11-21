@@ -1,4 +1,4 @@
-MINIBAR 1.6
+MINIBAR 1.6.1
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 OPEN IT
@@ -73,6 +73,10 @@ FILES
                                  release seen on GitHub)
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
+
+NEW IN 1.6.1
+- Minibar.exe works on its own (no zip needed, e.g. sent over Discord). If it sits
+  loose in a folder like Downloads, installed apps go right beside it (Downloads\Pulp).
 
 NEW IN 1.6
 - Install: an app that isn't on this PC gets an Install button on its card. Minibar

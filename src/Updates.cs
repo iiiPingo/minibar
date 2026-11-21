@@ -296,9 +296,7 @@ namespace Minibar
             var tries = new List<string>();
             try
             {
-                string mine = Path.GetDirectoryName(selfExe ?? "");
-                string parent = string.IsNullOrEmpty(mine) ? null : Path.GetDirectoryName(mine);
-                if (!string.IsNullOrEmpty(parent)) tries.Add(Path.Combine(parent, d.Name));
+                tries.Add(Path.Combine(Apps.AppsHome(selfExe), d.Name));
             }
             catch { }
             tries.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", d.Name));
