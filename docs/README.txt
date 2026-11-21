@@ -1,4 +1,4 @@
-MINIBAR 1.4.5
+MINIBAR 1.5
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 OPEN IT
@@ -71,6 +71,12 @@ FILES
                                  release seen on GitHub)
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
+
+NEW IN 1.5
+- Your apps show up in Windows search. Minibar adds a Start menu shortcut for each app it
+  finds (and for itself), with the app's icon, and keeps it pointing at the right exe.
+  Settings > "Show the apps in Windows search" turns it off and removes them. Shortcuts
+  you made yourself are never touched.
 
 NEW IN 1.4.5
 - The scroll bar works on the Apps and Updates pages: drag it, or click along the right

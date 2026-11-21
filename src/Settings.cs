@@ -17,6 +17,7 @@ namespace Minibar
         public Rectangle Window = Rectangle.Empty;       // negative w/h = maximized
         public bool MinimizeToTray = false;              // tray=1: minimizing hides the window to a tray icon
         public bool CheckUpdates = true;                 // checkupdates=0 turns the GitHub check off
+        public bool StartMenu = true;                    // startmenu=0: no Start menu shortcuts (Windows search)
         public DateTime LastCheck = DateTime.MinValue;   // lastcheck= (UTC ticks)
         // auto.<App>=1: install that app's updates by itself when Minibar finds them (off by default)
         public readonly HashSet<string> AutoUpdate = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -48,6 +49,7 @@ namespace Minibar
                     }
                     else if (k.Equals("tray", StringComparison.OrdinalIgnoreCase)) s.MinimizeToTray = v == "1";
                     else if (k.Equals("checkupdates", StringComparison.OrdinalIgnoreCase)) s.CheckUpdates = v != "0";
+                    else if (k.Equals("startmenu", StringComparison.OrdinalIgnoreCase)) s.StartMenu = v != "0";
                     else if (k.Equals("lastcheck", StringComparison.OrdinalIgnoreCase)) { if (long.TryParse(v, out long t) && t > 0 && t < DateTime.MaxValue.Ticks) s.LastCheck = new DateTime(t, DateTimeKind.Utc); }
                     else if (k.StartsWith("auto.", StringComparison.OrdinalIgnoreCase)) { if (v == "1") s.AutoUpdate.Add(k.Substring(5)); }
                     else if (k.StartsWith("rel.", StringComparison.OrdinalIgnoreCase) && v.Length > 0) s.Releases[k.Substring(4)] = v;
@@ -62,7 +64,7 @@ namespace Minibar
         // after a restore: take over what was read from the restored file
         public void CopyFrom(Settings o)
         {
-            Accent = o.Accent; MinimizeToTray = o.MinimizeToTray; CheckUpdates = o.CheckUpdates;
+            Accent = o.Accent; MinimizeToTray = o.MinimizeToTray; CheckUpdates = o.CheckUpdates; StartMenu = o.StartMenu;
             AutoUpdate.Clear(); foreach (var a in o.AutoUpdate) AutoUpdate.Add(a);
             Located.Clear(); foreach (var kv in o.Located) Located[kv.Key] = kv.Value;
             RunCmd.Clear(); foreach (var kv in o.RunCmd) RunCmd[kv.Key] = kv.Value;
@@ -82,6 +84,7 @@ namespace Minibar
                 if (!Window.IsEmpty) sb.AppendLine("window=" + Window.X + "," + Window.Y + "," + Window.Width + "," + Window.Height);
                 sb.AppendLine("tray=" + (MinimizeToTray ? "1" : "0"));
                 sb.AppendLine("checkupdates=" + (CheckUpdates ? "1" : "0"));
+                sb.AppendLine("startmenu=" + (StartMenu ? "1" : "0"));
                 if (LastCheck > DateTime.MinValue) sb.AppendLine("lastcheck=" + LastCheck.Ticks);
                 foreach (var a in AutoUpdate.OrderBy(k => k)) sb.AppendLine("auto." + a + "=1");
                 foreach (var kv in Releases.OrderBy(k => k.Key)) sb.AppendLine("rel." + kv.Key + "=" + kv.Value);

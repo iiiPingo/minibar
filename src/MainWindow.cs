@@ -263,6 +263,11 @@ namespace Minibar
             updT.On = st.CheckUpdates;
             updT.Changed += () => { st.CheckUpdates = updT.On; st.Save(); };
             p.Controls.Add(updT);
+            y += S(56);
+            var smT = new Toggle("Show the apps in Windows search", s) { Location = new Point(0, y), Width = w, Hint = "Start menu shortcuts for each app, so typing \"Pulp\" in search opens it. Off removes them.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            smT.On = st.StartMenu;
+            smT.Changed += () => { st.StartMenu = smT.On; st.Save(); StartMenu.Reset(); SyncStartMenu(); };
+            p.Controls.Add(smT);
             y += S(68);
 
             Lbl(p, "Finding your apps", 0, y, w, S(24), Theme.Text, fH2);
@@ -578,6 +583,7 @@ namespace Minibar
             {
                 Apps.Scan(apps, st);
                 foreach (var a in apps) if (a.Def.RunName != null) Apps.ReadStartup(a, st, false);
+                SyncStartMenu();
                 int found = apps.Count(a => a.Found), running = apps.Count(a => a.Running);
                 appsSub.Text = found == 0 ? "None of your apps were found yet. Use Locate on a card to point Minibar at one."
                     : running + " of " + found + " running"
@@ -761,6 +767,14 @@ namespace Minibar
         // for the offscreen layout check
         public void ShowPageForTest(int i) => ShowPage(i);
         public List<AppInfo> AppsForTest => apps;
+        void SyncStartMenu()
+        {
+            string self = null;
+            try { self = Application.ExecutablePath; } catch { }
+            if (self != null && Path.GetFileName(self).IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) self = null;   // mid self-update
+            StartMenu.Sync(apps, self, st.StartMenu);
+        }
+
         public AppList ListForTest => list;
         public AppInfo SelfForTest => self;
         public UpdateList UpdatesForTest => ulist;
