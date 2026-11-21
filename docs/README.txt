@@ -37,8 +37,11 @@ UPDATES (new in 1.1)
   release is, at most once an hour. "Check now" on the Updates page asks right away.
 - A newer version shows as an "Update to vX" button on the app's card and on the
   Updates page. One click: Minibar downloads it, checks it really contains the app,
-  closes the app if it's running, keeps a copy of the old files, puts the new ones
-  in, and starts the app again the way it normally starts.
+  keeps a copy of the old files and puts the new ones in place of the old exe.
+- Minibar never closes an app to update it. If the app is running, the button turns
+  into "Updates when you close it": close the app (Stop, or its own Exit) and the
+  update goes in right away. Click it again to cancel.
+- Leftover <App>.old-*.exe files in an app's folder are deleted once the app is closed.
 - If anything goes wrong halfway, every file is put back and the app is started
   again as it was. Your settings live in %APPDATA% and are never touched; .ini, .log
   and database files in the app's folder are skipped too.
@@ -48,8 +51,7 @@ UPDATES (new in 1.1)
   Minibar finds one.
 - "What's new" opens the release page.
 - Minibar can update itself the same way once it's on GitHub.
-- Notes: Juice has no version number yet, so Minibar can't compare it. Echoa 1.4+
-  isn't on GitHub yet (the repo still has Sip 1.3), so it shows "Newer than GitHub".
+- Juice's releases are on GitHub too; Echoa's live in the old "sip" repo.
 
 HOW MINIBAR FINDS THE APPS
 In this order: a file you picked with Locate, the running app, its
@@ -73,6 +75,9 @@ FILES
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
 
 NEW IN 1.5
+- Updates wait until you close the app: Minibar never closes an app to update it.
+  Close it and the new version goes in by itself (old exe out, new exe in).
+- Leftover .old exe files are cleaned up once an app is closed.
 - Your apps show up in Windows search. Minibar adds a Start menu shortcut for each app it
   finds (and for itself), with the app's icon, and keeps it pointing at the right exe.
   Settings > "Show the apps in Windows search" turns it off and removes them. Shortcuts

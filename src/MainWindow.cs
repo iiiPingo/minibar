@@ -384,6 +384,14 @@ namespace Minibar
         void StartInstall(AppInfo a)
         {
             if (a.Updating || a.Busy != null || !Updater.CanUpdate(a)) return;
+            if (a.Running)
+            {
+                // never close an app to update it: wait until he closes it, then swap the files in
+                a.Queued = true;
+                list.Invalidate(); ulist.Invalidate();
+                return;
+            }
+            a.Queued = false;
             a.Updating = true;
             a.Busy = "Waiting…";
             a.Error = null;
@@ -475,7 +483,7 @@ namespace Minibar
             {
                 switch (id)
                 {
-                    case "update": if (a.Def.Self) StartSelfUpdate(); else StartInstall(a); break;
+                    case "update": if (a.Def.Self) StartSelfUpdate(); else if (a.Queued) { a.Queued = false; list.Invalidate(); ulist.Invalidate(); } else StartInstall(a); break;
                     case "auto":
                         if (!st.AutoUpdate.Remove(a.Def.Name)) st.AutoUpdate.Add(a.Def.Name);
                         st.Save();
@@ -584,6 +592,10 @@ namespace Minibar
                 Apps.Scan(apps, st);
                 foreach (var a in apps) if (a.Def.RunName != null) Apps.ReadStartup(a, st, false);
                 SyncStartMenu();
+                foreach (var a in apps.Where(x => x.Queued && !x.Running && !x.Updating).ToList())
+                {
+                    if (Updater.CanUpdate(a)) StartInstall(a); else a.Queued = false;
+                }
                 int found = apps.Count(a => a.Found), running = apps.Count(a => a.Running);
                 appsSub.Text = found == 0 ? "None of your apps were found yet. Use Locate on a card to point Minibar at one."
                     : running + " of " + found + " running"
@@ -676,7 +688,7 @@ namespace Minibar
                     case "log": Apps.OpenText(a.LogPath); break;
                     case "locate": PickExe(a); break;
                     case "rescan": Apps.Locate(a, st, null); Rescan(); if (a.Def.TaskName != null) QueryTasks(); if (!a.Found) Fail(a, new InvalidOperationException("Still not found. Use Locate to pick " + a.Def.Name + ".exe.")); break;
-                    case "update": StartInstall(a); break;
+                    case "update": if (a.Queued) { a.Queued = false; list.Invalidate(); ulist.Invalidate(); } else StartInstall(a); break;
                     case "info": list.ToggleInfo(a); break;
                     case "link:pawnio": Process.Start(new ProcessStartInfo("https://pawnio.eu/") { UseShellExecute = true })?.Dispose(); break;
                     case "link:presentmon": Process.Start(new ProcessStartInfo("https://github.com/GameTechDev/PresentMon/releases") { UseShellExecute = true })?.Dispose(); break;

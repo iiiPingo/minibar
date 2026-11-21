@@ -97,6 +97,21 @@ namespace Minibar
         // updates
         public Release Rel;              // latest release on GitHub (null = not checked yet)
         public bool Updating;
+        public bool Queued;              // update waits until he closes the app himself
+        bool oldCleaned;
+        // leftovers from swapping a running exe (Pour.old-123.exe): gone once the app is closed
+        public void CleanOld()
+        {
+            if (Running) { oldCleaned = false; return; }
+            if (oldCleaned || Exe == null || Def.Self) return;
+            oldCleaned = true;
+            try
+            {
+                foreach (var f in Directory.GetFiles(Path.GetDirectoryName(Exe), Def.Name + ".old*.exe"))
+                    try { File.Delete(f); } catch { }
+            }
+            catch { }
+        }
         public string Backup;            // newest backup folder Minibar can restore (null = none)
         public string Note; public DateTime NoteUntil;   // good news for a few seconds ("Updated to v1.3")
 
@@ -277,6 +292,7 @@ namespace Minibar
                     Locate(a, s, path);
                 a.OtherCopy = a.Running && path != null && a.Exe != null && !SameFile(path, a.Exe) ? path : null;
                 if (a.Running != wasRunning && a.Def.Name == "Fizz") CheckFizz(a);
+                a.CleanOld();
                 a.RecentCrash = false;
                 if (a.Def.LogName == "crash.log")
                     try

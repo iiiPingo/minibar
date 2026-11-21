@@ -100,6 +100,7 @@ namespace Minibar
         }
 
         void Hit(Rectangle r, string id, AppInfo a) => hits.Add(Tuple.Create(r, a.Def.Name + "#" + id, a));
+        bool uhq(AppInfo a) => Hov(a, "update");
         bool Hov(AppInfo a, string id) => hover == a.Def.Name + "#" + id;
         string hoverCard;
 
@@ -168,13 +169,15 @@ namespace Minibar
             // a newer version on GitHub: accent pill next to the version
             if (Updater.CanUpdate(a) && a.Busy == null)
             {
-                string ut = "Update to v" + a.Rel.Label;
-                int uw = TextW(g, ut, fPillSemi) + S(36);
+                // queued: it installs the moment he closes the app (click again to cancel)
+                string ut = a.Queued ? (uhq(a) ? "Cancel update" : "Updates when you close it") : "Update to v" + a.Rel.Label;
+                int uw = TextW(g, a.Queued ? "Updates when you close it" : ut, fPillSemi) + S(36);   // same width while hovered, so it never flickers
                 var ur = new Rectangle(r.Right - S(18) - vw - S(12) - uw, top + S(16), uw, S(26));
                 bool uh = Hov(a, "update");
-                Theme.Fill(g, ur, uh ? Theme.AccentHover : Theme.Accent, ur.Height / 2f);
-                TextRenderer.DrawText(g, "\uE896", fPillIcon, new Rectangle(ur.X + S(10), ur.Y, S(14), ur.Height), Color.FromArgb(22, 22, 22), Ux.C);   // Download
-                TextRenderer.DrawText(g, ut, fPillSemi, new Rectangle(ur.X + S(28), ur.Y, uw - S(32), ur.Height), Color.FromArgb(22, 22, 22), Ux.L);
+                Color ink = a.Queued ? Theme.Accent : Color.FromArgb(22, 22, 22);
+                Theme.Fill(g, ur, a.Queued ? Color.FromArgb(uh ? 60 : 34, Theme.Accent) : uh ? Theme.AccentHover : Theme.Accent, ur.Height / 2f);
+                TextRenderer.DrawText(g, a.Queued ? "\uE823" : "\uE896", fPillIcon, new Rectangle(ur.X + S(10), ur.Y, S(14), ur.Height), ink, Ux.C);   // Recent / Download
+                TextRenderer.DrawText(g, ut, fPillSemi, new Rectangle(ur.X + S(28), ur.Y, uw - S(32), ur.Height), ink, Ux.L);
                 Hit(ur, "update", a);
             }
 

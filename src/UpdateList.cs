@@ -124,12 +124,13 @@ namespace Minibar
             }
             else if (st == UpdState.Available && !a.Updating)
             {
-                string t = "Update to v" + a.Rel.Label;
-                int bw = TextW(g, t, fBtn) + S(32);
-                var br = new Rectangle(right - bw, cy, bw, S(32));
                 bool h = Hov(a, "update");
-                Theme.Fill(g, br, h ? Theme.AccentHover : Theme.Accent, S(7));
-                TextRenderer.DrawText(g, t, fBtn, br, Color.FromArgb(22, 22, 22), Ux.C);
+                string t = a.Queued ? (h ? "Cancel update" : "Updates when you close " + a.Def.Name) : "Update to v" + a.Rel.Label;
+                int bw = TextW(g, a.Queued ? "Updates when you close " + a.Def.Name : t, fBtn) + S(32);
+                var br = new Rectangle(right - bw, cy, bw, S(32));
+                if (a.Queued) Theme.Fill(g, br, Color.FromArgb(h ? 60 : 34, Theme.Accent), S(7));
+                else Theme.Fill(g, br, h ? Theme.AccentHover : Theme.Accent, S(7));
+                TextRenderer.DrawText(g, t, fBtn, br, a.Queued ? Theme.Accent : Color.FromArgb(22, 22, 22), Ux.C);
                 Hit(br, "update", a);
                 right = br.X - S(8);
             }
