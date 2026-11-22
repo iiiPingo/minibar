@@ -1,4 +1,4 @@
-MINIBAR 1.7.0
+MINIBAR 1.7.1
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 INSTALL (two ways, both update themselves the same way)
@@ -87,6 +87,9 @@ FILES
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
 %LOCALAPPDATA%\Programs\Minibar Minibar itself, when installed with the setup
+
+NEW IN 1.7.1
+- Settings shows the plain version number (no build code after it).
 
 NEW IN 1.7.0
 - Update closes the app for you: one click closes it, updates it and opens it again.
