@@ -1,4 +1,4 @@
-MINIBAR 1.6.4
+MINIBAR 1.7.0
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 INSTALL (two ways, both update themselves the same way)
@@ -49,9 +49,11 @@ UPDATES (new in 1.1)
 - A newer version shows as an "Update to vX" button on the app's card and on the
   Updates page. One click: Minibar downloads it, checks it really contains the app,
   keeps a copy of the old files and puts the new ones in place of the old exe.
-- Minibar never closes an app to update it. If the app is running, the button turns
-  into "Updates when you close it": close the app (Stop, or its own Exit) and the
-  update goes in right away. Click it again to cancel.
+- If the app is open, Minibar closes it (asking it to close cleanly first), updates it
+  and opens it again the way it was running (Pour and Pulp in the tray, and so on).
+- Pour in the middle of a download is the exception: the button turns into "Updates
+  after downloads finish", and the update goes in by itself once the download is done.
+  Click it again to cancel.
 - Leftover <App>.old-*.exe files in an app's folder are deleted once the app is closed.
 - If anything goes wrong halfway, every file is put back and the app is started
   again as it was. Your settings live in %APPDATA% and are never touched; .ini, .log
@@ -86,7 +88,10 @@ FILES
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
 %LOCALAPPDATA%\Programs\Minibar Minibar itself, when installed with the setup
 
-NEW IN 1.6.4
+NEW IN 1.7.0
+- Update closes the app for you: one click closes it, updates it and opens it again.
+  No more "Updates when you close it". Auto updates work the same way. Pour waits
+  until its downloads are done, so nothing gets cut off.
 - Minibar-Setup: an installer for friends who'd rather have Minibar in Start and in
   Installed apps (with a proper uninstall). The plain Minibar.exe still works exactly
   as before, and both kinds keep updating themselves from GitHub.

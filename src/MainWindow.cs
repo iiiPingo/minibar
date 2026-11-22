@@ -428,9 +428,10 @@ namespace Minibar
         void StartInstall(AppInfo a)
         {
             if (a.Updating || a.Busy != null || !Updater.CanUpdate(a)) return;
-            if (a.Running)
+            // a running app is closed (cleanly first), updated and opened again the way it was running (Updater.Apply).
+            // Only Pour in the middle of a download waits: the update goes in by itself once the download is done.
+            if (Apps.BusyWithWork(a))
             {
-                // never close an app to update it: wait until he closes it, then swap the files in
                 a.Queued = true;
                 list.Invalidate(); ulist.Invalidate();
                 return;
@@ -636,7 +637,7 @@ namespace Minibar
                 Apps.Scan(apps, st);
                 foreach (var a in apps) if (a.Def.RunName != null) Apps.ReadStartup(a, st, false);
                 SyncStartMenu();
-                foreach (var a in apps.Where(x => x.Queued && !x.Running && !x.Updating).ToList())
+                foreach (var a in apps.Where(x => x.Queued && !x.Updating && !Apps.BusyWithWork(x)).ToList())
                 {
                     if (Updater.CanUpdate(a)) StartInstall(a); else a.Queued = false;
                 }

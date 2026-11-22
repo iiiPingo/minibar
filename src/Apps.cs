@@ -24,6 +24,7 @@ namespace Minibar
         public Version ExitSince;        // from this version on, "<App>.exe --exit" asks the running app to close cleanly
         public string Highlights;       // the line under the name: what the app is best at
         public string InfoTitle, Info;   // the (i) note on the card (Juice: which devices work)
+        public bool WaitForWork;         // Pour: an update waits while it has a download running (yt-dlp/ffmpeg under it)
     }
 
     static class Catalog
@@ -53,7 +54,7 @@ namespace Minibar
                        "\u2022  Xbox (over Bluetooth) and GameSir controllers\n\n" +
                        "Not yet: Razer, Corsair, HyperX and other brands' own USB receivers. Right-click Juice > Diagnostics shows everything it can see."
             },
-            new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists", Repos = new[] { "pour" }, ExitSince = new Version(1, 2) },
+            new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists", Repos = new[] { "pour" }, ExitSince = new Version(1, 2), WaitForWork = true },
             new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3) },
             // Fizz last: its card can carry the PawnIO / anti-cheat notice
             new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1) },
@@ -97,7 +98,7 @@ namespace Minibar
         // updates
         public Release Rel;              // latest release on GitHub (null = not checked yet)
         public bool Updating;
-        public bool Queued;              // update waits until he closes the app himself
+        public bool Queued;              // update waits until the app is idle (Pour: its downloads are done), then closes, updates and reopens it
         bool oldCleaned;
         // leftovers from swapping a running exe (Pour.old-123.exe): gone once the app is closed
         public void CleanOld()
@@ -369,6 +370,13 @@ namespace Minibar
         {
             string cmd = RunValue(a.Def.RunName);
             return cmd != null && SameFile(ExeFromCommand(cmd), a.Exe) ? ArgsFromCommand(cmd) : a.Def.StartArgs;
+        }
+
+        // busy with something an update would cut off: Pour downloading (any process it started that's still running)
+        public static bool BusyWithWork(AppInfo a)
+        {
+            if (!a.Def.WaitForWork || !a.Running || a.Pids.Count == 0) return false;
+            try { return Native.DescendantsOf(a.Pids).Count > 0; } catch { return false; }
         }
 
         // force-closes the app and anything it started (Pour's yt-dlp, Fizz's PresentMon), then clears its tray icon

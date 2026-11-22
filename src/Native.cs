@@ -37,6 +37,55 @@ namespace Minibar
             finally { CloseHandle(h); }
         }
 
+        // ------------------------------------------------------------ processes a process started (and theirs), console hosts left out
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct PROCESSENTRY32W
+        {
+            public int dwSize, cntUsage, th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public int th32ModuleID, cntThreads, th32ParentProcessID, pcPriClassBase, dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szExeFile;
+        }
+        [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr CreateToolhelp32Snapshot(int flags, int pid);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool Process32FirstW(IntPtr snap, ref PROCESSENTRY32W e);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool Process32NextW(IntPtr snap, ref PROCESSENTRY32W e);
+
+        public static List<string> DescendantsOf(ICollection<int> pids)
+        {
+            var all = new List<Tuple<int, int, string>>();   // pid, parent, exe
+            IntPtr snap = CreateToolhelp32Snapshot(2 /* TH32CS_SNAPPROCESS */, 0);
+            if (snap == IntPtr.Zero || snap == (IntPtr)(-1)) return new List<string>();
+            try
+            {
+                var e = new PROCESSENTRY32W { dwSize = Marshal.SizeOf(typeof(PROCESSENTRY32W)) };
+                for (bool ok = Process32FirstW(snap, ref e); ok; ok = Process32NextW(snap, ref e))
+                    all.Add(Tuple.Create(e.th32ProcessID, e.th32ParentProcessID, e.szExeFile ?? ""));
+            }
+            finally { CloseHandle(snap); }
+            return Descendants(all, pids);
+        }
+
+        // pure part (tested in the workspace): walk the parent links down from pids
+        public static List<string> Descendants(IList<Tuple<int, int, string>> all, ICollection<int> pids)
+        {
+            var found = new List<string>();
+            var frontier = new HashSet<int>(pids);
+            var seen = new HashSet<int>(pids);
+            while (frontier.Count > 0)
+            {
+                var next = new HashSet<int>();
+                foreach (var p in all)
+                    if (frontier.Contains(p.Item2) && p.Item1 != p.Item2 && seen.Add(p.Item1))
+                    {
+                        next.Add(p.Item1);
+                        string n = p.Item3.ToLowerInvariant();
+                        if (n != "conhost.exe" && n != "werfault.exe") found.Add(p.Item3);
+                    }
+                frontier = next;
+            }
+            return found;
+        }
+
         // ------------------------------------------------------------ windows of a process (for removing a stopped app's tray icon)
         delegate bool EnumProc(IntPtr h, IntPtr l);
         [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);

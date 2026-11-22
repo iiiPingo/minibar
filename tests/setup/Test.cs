@@ -25,7 +25,7 @@ static class Test
         Inst.DesktopLink = Path.Combine(root, "Desktop", "Minibar.lnk");
         Inst.DataDir = Path.Combine(root, "Roaming", "Minibar");
         Inst.LocalDataDir = Path.Combine(root, "Local", "Minibar");
-        string fakeSetup = Path.Combine(root, "Downloads", "Minibar-Setup-1.6.4.exe");
+        string fakeSetup = Path.Combine(root, "Downloads", "Minibar-Setup-1.7.0.exe");
         Directory.CreateDirectory(Path.GetDirectoryName(fakeSetup));
         File.WriteAllBytes(fakeSetup, new byte[] { 0x4D, 0x5A, 1, 2, 3 });
         Inst.SelfPath = fakeSetup;
@@ -39,7 +39,7 @@ static class Test
         string settingsBefore = File.ReadAllText(Path.Combine(Inst.DataDir, "settings.ini"));
 
         byte[] exe = Res("payload/Minibar.exe");
-        Ok(Inst.PayloadVersion == "1.6.4", "payload version 1.6.4 (" + Inst.PayloadVersion + ")");
+        Ok(Inst.PayloadVersion == "1.7", "payload version 1.7 (" + Inst.PayloadVersion + ")");
         Ok(Inst.InstalledVersion == null, "nothing installed at first");
 
         // 1. fresh install
@@ -48,12 +48,12 @@ static class Test
         Ok(File.Exists(Path.Combine(Inst.Dir, "Minibar.exe.config")) && File.Exists(Path.Combine(Inst.Dir, "README.txt")), "fresh: config + README");
         Ok(SameBytes(Inst.Uninstaller, File.ReadAllBytes(fakeSetup)), "fresh: uninstaller is a copy of the setup");
         Ok(!Directory.GetFiles(Inst.Dir).Any(f => f.EndsWith(".setup-new") || f.Contains(".old")), "fresh: no temp/old files left");
-        Ok(Inst.InstalledVersion == "1.6.4", "fresh: installed version reads 1.6.4 (" + Inst.InstalledVersion + ")");
+        Ok(Inst.InstalledVersion == "1.7", "fresh: installed version reads 1.7.0 (" + Inst.InstalledVersion + ")");
         using (var k = Registry.CurrentUser.OpenSubKey(Inst.RegKey))
         {
             Ok(k != null, "registry: uninstall key exists");
             Ok(k?.GetValue("DisplayName") as string == "Minibar", "registry: DisplayName");
-            Ok(k?.GetValue("DisplayVersion") as string == "1.6.4", "registry: DisplayVersion");
+            Ok(k?.GetValue("DisplayVersion") as string == "1.7", "registry: DisplayVersion");
             Ok(k?.GetValue("InstallLocation") as string == Inst.Dir, "registry: InstallLocation");
             Ok((k?.GetValue("UninstallString") as string ?? "").Contains("Uninstall Minibar.exe"), "registry: UninstallString");
             Ok(k?.GetValue("DisplayIcon") as string == Inst.Exe + ",0", "registry: DisplayIcon");

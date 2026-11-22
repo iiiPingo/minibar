@@ -170,9 +170,9 @@ namespace Minibar
             // a newer version on GitHub: accent pill next to the version
             if (Updater.CanUpdate(a) && a.Busy == null)
             {
-                // queued: it installs the moment he closes the app (click again to cancel)
-                string ut = a.Queued ? (uhq(a) ? "Cancel update" : "Updates when you close it") : "Update to v" + a.Rel.Label;
-                int uw = TextW(g, a.Queued ? "Updates when you close it" : ut, fPillSemi) + S(36);   // same width while hovered, so it never flickers
+                // queued: Pour is downloading; it updates by itself once that's done (click again to cancel)
+                string ut = a.Queued ? (uhq(a) ? "Cancel update" : "Updates after downloads finish") : "Update to v" + a.Rel.Label;
+                int uw = TextW(g, a.Queued ? "Updates after downloads finish" : ut, fPillSemi) + S(36);   // same width while hovered, so it never flickers
                 var ur = new Rectangle(r.Right - S(18) - vw - S(12) - uw, top + S(16), uw, S(26));
                 bool uh = Hov(a, "update");
                 Color ink = a.Queued ? Theme.Accent : Color.FromArgb(22, 22, 22);

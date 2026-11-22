@@ -125,8 +125,8 @@ namespace Minibar
             else if (st == UpdState.Available && !a.Updating)
             {
                 bool h = Hov(a, "update");
-                string t = a.Queued ? (h ? "Cancel update" : "Updates when you close " + a.Def.Name) : "Update to v" + a.Rel.Label;
-                int bw = TextW(g, a.Queued ? "Updates when you close " + a.Def.Name : t, fBtn) + S(32);
+                string t = a.Queued ? (h ? "Cancel update" : "Updates after downloads finish") : "Update to v" + a.Rel.Label;
+                int bw = TextW(g, a.Queued ? "Updates after downloads finish" : t, fBtn) + S(32);
                 var br = new Rectangle(right - bw, cy, bw, S(32));
                 if (a.Queued) Theme.Fill(g, br, Color.FromArgb(h ? 60 : 34, Theme.Accent), S(7));
                 else Theme.Fill(g, br, h ? Theme.AccentHover : Theme.Accent, S(7));
