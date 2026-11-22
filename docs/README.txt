@@ -1,8 +1,19 @@
-MINIBAR 1.6.3
+MINIBAR 1.6.4
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
+INSTALL (two ways, both update themselves the same way)
+- Setup: run Minibar-Setup-x.y.z.exe and click Install. It installs just for you (no
+  admin) into %LOCALAPPDATA%\Programs\Minibar, adds Minibar to Start (and the desktop
+  if you want), and lists it in Settings > Apps > Installed apps so it uninstalls
+  cleanly. Running a newer setup later updates it in place.
+- Portable: put Minibar.exe anywhere and run it. Nothing gets installed.
+- Already using the portable Minibar? Run the setup: it closes Minibar, installs it and
+  opens it again. Your settings carry over. The old Minibar.exe can be deleted afterwards.
+- Uninstall (setup copy only): Settings > Apps > Installed apps > Minibar > Uninstall.
+  Your drink apps stay installed. Minibar's settings stay too unless you tick "Also delete".
+
 OPEN IT
-- Double-click Minibar.exe. It's a normal window: open it, use it, close it.
+- Double-click Minibar.exe (or Start > Minibar). It's a normal window: open it, use it, close it.
   No tray icon, nothing running in the background once it's closed.
 - First run only: if Windows SmartScreen shows up, click "More info" then "Run anyway".
 - Opening Minibar again while it's open just brings the window back.
@@ -73,6 +84,15 @@ FILES
                                  release seen on GitHub)
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
+%LOCALAPPDATA%\Programs\Minibar Minibar itself, when installed with the setup
+
+NEW IN 1.6.4
+- Minibar-Setup: an installer for friends who'd rather have Minibar in Start and in
+  Installed apps (with a proper uninstall). The plain Minibar.exe still works exactly
+  as before, and both kinds keep updating themselves from GitHub.
+- Minibar remembers where it last found each app (seen.<App>= in settings.ini), so moving
+  Minibar to a new folder, or installing it with the setup, doesn't lose your apps.
+- When installed with the setup, the version in Installed apps follows Minibar's updates.
 
 NEW IN 1.6.3
 - The line under the title on Apps and Updates is no longer cut off at the bottom.

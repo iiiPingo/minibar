@@ -192,7 +192,7 @@ namespace Minibar
             return mine;
         }
 
-        static IEnumerable<string> Candidates(AppDef d)
+        static IEnumerable<string> Candidates(AppDef d, Settings s)
         {
             var found = new List<string>();
             void Walk(string dir, int depth)
@@ -232,6 +232,19 @@ namespace Minibar
             catch { }
             string progs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", d.Name);
             if (Directory.Exists(progs)) Walk(progs, 1);
+            // where Minibar found it before (Minibar may have moved: setup, a new folder), and its Start menu shortcut
+            void Add(string f)
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(f) || !File.Exists(f) || Path.GetFileName(f).IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) return;
+                    if (!Path.GetFileName(f).Equals(d.Name + ".exe", StringComparison.OrdinalIgnoreCase)) return;
+                    if (!found.Any(x => SameFile(x, f))) found.Add(f);
+                }
+                catch { }
+            }
+            if (s != null && s.Seen.TryGetValue(d.Name, out var seen)) Add(seen);
+            Add(StartMenu.TargetOf(d.Name));
             return found;
         }
 
@@ -247,10 +260,12 @@ namespace Minibar
                 if (run != null && File.Exists(run) && Path.GetFileName(run).Equals(a.Def.Name + ".exe", StringComparison.OrdinalIgnoreCase)) { exe = run; src = "startup"; }
                 else
                 {
-                    exe = Candidates(a.Def).OrderByDescending(FileVer).ThenByDescending(f => { try { return File.GetLastWriteTimeUtc(f); } catch { return DateTime.MinValue; } }).FirstOrDefault();
+                    exe = Candidates(a.Def, s).OrderByDescending(FileVer).ThenByDescending(f => { try { return File.GetLastWriteTimeUtc(f); } catch { return DateTime.MinValue; } }).FirstOrDefault();
                     src = exe != null ? "found" : null;
                 }
             }
+            if (exe != null && src != "located" && !a.Def.Self && (!s.Seen.TryGetValue(a.Def.Name, out var was) || !SameFile(was, exe)))
+                s.Seen[a.Def.Name] = exe;   // saved with the other settings
             bool changed = !SameFile(exe, a.Exe) || (exe == null) != (a.Exe == null);
             a.Exe = exe;
             a.Source = src;

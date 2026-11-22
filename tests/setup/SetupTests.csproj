@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- workspace tests for the setup's install/uninstall logic (run with mono after ../../build.sh) -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Version>1.6.4</Version>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>/usr/lib/mono/4.8-api</FrameworkPathOverride>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Compile Include="Test.cs" />
+    <Compile Include="..\..\setup\Installer.cs" />
+    <Compile Include="..\..\setup\SetupWindow.cs" />
+    <Compile Include="..\..\src\Theme.cs" />
+    <Compile Include="..\..\src\Controls.cs" />
+    <EmbeddedResource Include="..\..\src\minibar.ico" LogicalName="minibar.ico" />
+    <EmbeddedResource Include="..\..\src\bin\Release\net48\Minibar.exe" LogicalName="payload/Minibar.exe" />
+    <EmbeddedResource Include="..\..\src\bin\Release\net48\Minibar.exe.config" LogicalName="payload/Minibar.exe.config" />
+    <EmbeddedResource Include="..\..\docs\README.txt" LogicalName="payload/README.txt" />
+  </ItemGroup>
+</Project>

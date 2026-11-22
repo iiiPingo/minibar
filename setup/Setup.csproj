@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Minibar-Setup.exe: per-user installer for Minibar. Build src first (or run ../build.sh):
+       the setup carries src/bin/Release/net48/Minibar.exe + Minibar.exe.config and docs/README.txt inside it. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Minibar-Setup</AssemblyName>
+    <RootNamespace>MinibarSetup</RootNamespace>
+    <ApplicationIcon>..\src\minibar.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!-- same version as Minibar (build.sh passes -p:Version=...) -->
+    <Version>1.6.4</Version>
+    <Product>Minibar Setup</Product>
+    <AssemblyTitle>Minibar Setup</AssemblyTitle>
+    <Description>Minibar Setup</Description>
+    <Company>Pingo</Company>
+    <DebugType>none</DebugType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT' And Exists('/usr/lib/mono/4.8-api')">
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>/usr/lib/mono/4.8-api</FrameworkPathOverride>
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Compile Include="*.cs" />
+    <Compile Include="..\src\Theme.cs" />
+    <Compile Include="..\src\Controls.cs" />
+    <EmbeddedResource Include="..\src\minibar.ico" LogicalName="minibar.ico" />
+    <EmbeddedResource Include="..\src\bin\Release\net48\Minibar.exe" LogicalName="payload/Minibar.exe" />
+    <EmbeddedResource Include="..\src\bin\Release\net48\Minibar.exe.config" LogicalName="payload/Minibar.exe.config" />
+    <EmbeddedResource Include="..\docs\README.txt" LogicalName="payload/README.txt" />
+  </ItemGroup>
+</Project>

@@ -69,6 +69,26 @@ namespace Minibar
         static void Set(object o, string p, object v) => o.GetType().InvokeMember(p, BindingFlags.SetProperty, null, o, new[] { v });
         static void Release(object o) { try { if (o != null && System.Runtime.InteropServices.Marshal.IsComObject(o)) System.Runtime.InteropServices.Marshal.ReleaseComObject(o); } catch { } }
 
+        // where Minibar's own shortcut for an app points (null when there's none, or it's the user's own)
+        public static string TargetOf(string name)
+        {
+            object shell = null, sc = null;
+            try
+            {
+                if (string.IsNullOrEmpty(Folder)) return null;
+                string link = LinkFor(name);
+                if (!File.Exists(link)) return null;
+                var t = Type.GetTypeFromProgID("WScript.Shell");
+                if (t == null) return null;
+                shell = Activator.CreateInstance(t);
+                sc = Call(shell, "CreateShortcut", link);
+                if (!(Get(sc, "Description") as string ?? "").Contains(Mark)) return null;
+                return Get(sc, "TargetPath") as string;
+            }
+            catch { return null; }
+            finally { Release(sc); Release(shell); }
+        }
+
         // forget what was synced, so the next Sync checks every shortcut again
         public static void Reset() => done.Clear();
     }

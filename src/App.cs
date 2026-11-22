@@ -24,6 +24,7 @@ namespace Minibar
                     Native.PostMessage((IntPtr)0xffff, Native.WM_SHOWMINIBAR, IntPtr.Zero, IntPtr.Zero);
                     return;
                 }
+                InstallInfo.Sync();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -47,6 +48,28 @@ namespace Minibar
                 Application.Run(w);
                 GC.KeepAlive(mutex);
             }
+        }
+    }
+
+    // Installed with Minibar-Setup: keep the version in Windows' Installed apps list current after self-updates
+    static class InstallInfo
+    {
+        public const string Key = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Minibar";
+        public static void Sync()
+        {
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Key, true))
+                {
+                    if (k == null) return;
+                    string loc = (k.GetValue("InstallLocation") as string ?? "").TrimEnd('\\');
+                    string dir = (Path.GetDirectoryName(Application.ExecutablePath) ?? "").TrimEnd('\\');
+                    if (loc.Length == 0 || !string.Equals(Path.GetFullPath(loc), Path.GetFullPath(dir), StringComparison.OrdinalIgnoreCase)) return;
+                    string v = Apps.VersionText(Application.ExecutablePath);
+                    if (v != null && !string.Equals(k.GetValue("DisplayVersion") as string, v)) k.SetValue("DisplayVersion", v);
+                }
+            }
+            catch { }
         }
     }
 
