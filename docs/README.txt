@@ -95,7 +95,7 @@ NEW IN 1.7.0
 - Update closes the app for you: one click closes it, updates it and opens it again.
   No more "Updates when you close it". Auto updates work the same way. Pour waits
   until its downloads are done, so nothing gets cut off.
-- Minibar-Setup: an installer for friends who'd rather have Minibar in Start and in
+- Minibar-Setup: an installer for anyone who'd rather have Minibar in Start and in
   Installed apps (with a proper uninstall). The plain Minibar.exe still works exactly
   as before, and both kinds keep updating themselves from GitHub.
 - Minibar remembers where it last found each app (seen.<App>= in settings.ini), so moving
@@ -120,7 +120,7 @@ NEW IN 1.6
 - Install: an app that isn't on this PC gets an Install button on its card. Minibar
   downloads it from GitHub, puts it in a folder next to Minibar's own (e.g.
   Downloads\Minibar -> Downloads\Pulp) and starts it. Fizz is installed but waits for
-  you to read its notice and press Start. So a friend only needs Minibar.
+  you to read its notice and press Start. So a new user only needs Minibar.
 
 NEW IN 1.5
 - Updates wait until you close the app: Minibar never closes an app to update it.
