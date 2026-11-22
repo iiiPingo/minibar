@@ -135,7 +135,7 @@ namespace Minibar
                 right = br.X - S(8);
             }
             if (a.Backup != null && a.Busy == null)
-                right -= Chip(g, a, "rollback", "Restore " + (Updater.BackupLabel(a.Backup) ?? "previous"), right, cy) + S(4);
+                right -= Chip(g, a, "rollback", "Restore " + (a.BackupLabel ?? "previous"), right, cy) + S(4);
             if (a.Rel?.Repo != null && a.Rel.Problem != "missing")
                 right -= Chip(g, a, "notes", "What's new", right, cy) + S(4);
 

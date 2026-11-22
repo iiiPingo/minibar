@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <Version>1.7.1</Version>
+    <Version>1.7.2</Version>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
     <FrameworkPathOverride>/usr/lib/mono/4.8-api</FrameworkPathOverride>

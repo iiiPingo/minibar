@@ -51,10 +51,30 @@ namespace Minibar
         }
     }
 
+    // Held by every install / update / rollback while it runs, so the setup (or anything else) can wait for it
+    // instead of force-closing Minibar halfway through.
+    static class UpdateLock
+    {
+        public const string Name = "Minibar.Updating.v1";
+    }
+
     // Installed with Minibar-Setup: keep the version in Windows' Installed apps list current after self-updates
     static class InstallInfo
     {
         public const string Key = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Minibar";
+        public static bool IsInstallDir(string dir)
+        {
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Key))
+                {
+                    string loc = (k?.GetValue("InstallLocation") as string ?? "").TrimEnd('\\');
+                    return loc.Length > 0 && string.Equals(Path.GetFullPath(loc), Path.GetFullPath(dir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch { return false; }
+        }
+
         public static void Sync()
         {
             try

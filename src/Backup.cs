@@ -13,7 +13,9 @@ namespace Minibar
     // Settings only: Pulp's clipboard history, logs and downloaded tools are left out (big, and rebuilt by themselves).
     static class SettingsBackup
     {
+#pragma warning disable CS0649
         public static Func<string, string, bool> ZipOverride, UnzipOverride;   // test hooks
+#pragma warning restore CS0649
 
         static readonly string[] KeepExt = { ".ini", ".txt", ".json", ".cfg", ".xml", ".csv" };
         static readonly string[] SkipNames = { "crash.log", "status.txt", "sensors.txt", "juice.log", "diagnostics.txt" };
@@ -92,7 +94,21 @@ namespace Minibar
             catch { return -1; }
         }
 
-        public class Contents { public string Dir, Made; public List<string> Apps = new List<string>(); }
+        // Root = the folder Open unpacked into (delete exactly that afterwards); Dir = where minibar-backup.txt is inside it
+        public class Contents { public string Root, Dir, Made; public List<string> Apps = new List<string>(); }
+
+        public static void Discard(Contents c)
+        {
+            try
+            {
+                if (c?.Root == null) return;
+                // only ever a restore-<ticks> folder this Minibar made
+                if (!Path.GetFileName(c.Root).StartsWith("restore-", StringComparison.Ordinal)) return;
+                if (!Apps.SameFile(Path.GetDirectoryName(c.Root), Updater.Root)) return;
+                if (Directory.Exists(c.Root)) Directory.Delete(c.Root, true);
+            }
+            catch { }
+        }
 
         // unpacks and reads what's in a backup (caller deletes Dir afterwards)
         public static Contents Open(string zipPath)
@@ -101,7 +117,7 @@ namespace Minibar
             if (!Unzip(zipPath, dir)) throw new Exception("Couldn't open that zip.");
             string m = Directory.GetFiles(dir, "minibar-backup.txt", SearchOption.AllDirectories).FirstOrDefault();
             if (m == null) { try { Directory.Delete(dir, true); } catch { } throw new Exception("That zip isn't a Minibar settings backup."); }
-            var c = new Contents { Dir = Path.GetDirectoryName(m) };
+            var c = new Contents { Root = dir, Dir = Path.GetDirectoryName(m) };
             foreach (var l in File.ReadAllLines(m))
             {
                 if (l.StartsWith("made=")) c.Made = l.Substring(5);
@@ -121,7 +137,7 @@ namespace Minibar
                 string from = Path.Combine(c.Dir, a.Def.Name);
                 if (!c.Apps.Contains(a.Def.Name) || !Directory.Exists(from) || a.Def.Self) continue;
                 string to = a.DataDir;
-                var pids = Apps.PidsNow(a.Def);
+                var pids = Apps.PidsNow(a);
                 bool wasRunning = pids.Count > 0 && a.Found;
                 string args = a.Found ? Apps.RestartArgs(a) : null;
                 if (wasRunning) { progress("Closing " + a.Def.Name + "…"); a.Pids = pids; Apps.Stop(a); }

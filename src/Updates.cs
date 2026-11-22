@@ -41,10 +41,12 @@ namespace Minibar
         public static string BackupRoot => Path.Combine(Root, "backup");
 
         // test hooks
+#pragma warning disable CS0649
         public static Func<string, string, bool> ExtractOverride;   // (zip, dir) -> ok
         public static Action AfterFirstCopy;                         // throw here to test the undo
         public static Func<string, string, Action<int>, string> DownloadOverride;
-        public static Action<string, string> SelfStartOverride;      // (exe, args)
+        public static Action<string, string> SelfStartOverride;      // (exe, args); throw to test a failed start
+#pragma warning restore CS0649
 
         static readonly object installGate = new object();
 
@@ -346,8 +348,10 @@ namespace Minibar
             string appDir = Path.GetDirectoryName(a.Exe);
             var files = Files(payload);
             if (files.Count == 0) throw new Exception("Nothing to install.");
+            // the release's <App>.exe goes in under the name the exe really has ("Pulp (2).exe"), or the update changes nothing
+            string Dest(string rel) => Path.Combine(appDir, RealName(rel, a));
 
-            var pids = Apps.PidsNow(a.Def);
+            var pids = Apps.PidsNow(a);
             bool wasRunning = pids.Count > 0;
             string args = Apps.RestartArgs(a);
             if (wasRunning)
@@ -369,7 +373,7 @@ namespace Minibar
                     Directory.CreateDirectory(bdir);
                     foreach (var rel in files.Concat(removeOnSuccess ?? new List<string>()).Distinct(StringComparer.OrdinalIgnoreCase))
                     {
-                        string dest = Path.Combine(appDir, rel);
+                        string dest = Dest(rel);
                         if (!File.Exists(dest)) continue;
                         string b = Path.Combine(bdir, rel);
                         Directory.CreateDirectory(Path.GetDirectoryName(b));
@@ -380,7 +384,7 @@ namespace Minibar
                     bool first = true;
                     foreach (var rel in files.OrderBy(r => r.Equals(a.Def.Name + ".exe", StringComparison.OrdinalIgnoreCase) ? 1 : 0))   // exe last
                     {
-                        string dest = Path.Combine(appDir, rel);
+                        string dest = Dest(rel);
                         bool existed = File.Exists(dest);
                         Directory.CreateDirectory(Path.GetDirectoryName(dest));
                         CopyRetry(Path.Combine(payload, rel), dest);
@@ -389,7 +393,7 @@ namespace Minibar
                     }
                     foreach (var rel in removeOnSuccess ?? new List<string>())
                     {
-                        string dest = Path.Combine(appDir, rel);
+                        string dest = Dest(rel);
                         if (File.Exists(dest)) { File.Delete(dest); removedBackedUp.Add(rel); }
                     }
                     WriteManifest(bdir, a, created, backupLabel);
@@ -397,7 +401,7 @@ namespace Minibar
                 catch (Exception ex)
                 {
                     progress("Undoing…");
-                    string undo = Restore(appDir, bdir, backed, created);
+                    string undo = Restore(Dest, bdir, backed, created);
                     try { Directory.Delete(bdir, true); } catch { }
                     throw new Exception("The update didn't go through, so " + a.Def.Name + " was put back as it was. (" + ex.Message + ")" + (undo != null ? " " + undo : ""));
                 }
@@ -437,13 +441,22 @@ namespace Minibar
             throw new Exception(Path.GetFileName(exe) + " is still in use.");
         }
 
-        static string Restore(string appDir, string bdir, List<string> backed, List<string> created)
+        // "Pulp.exe" (and its .config) in a release or backup -> the name the app's exe really has
+        static string RealName(string rel, AppInfo a)
+        {
+            string exeName = Path.GetFileName(a.Exe);
+            if (rel.Equals(a.Def.Name + ".exe", StringComparison.OrdinalIgnoreCase)) return exeName;
+            if (rel.Equals(a.Def.Name + ".exe.config", StringComparison.OrdinalIgnoreCase)) return exeName + ".config";
+            return rel;
+        }
+
+        static string Restore(Func<string, string> dest, string bdir, List<string> backed, List<string> created)
         {
             var failed = new List<string>();
             foreach (var rel in backed)
-                try { CopyRetry(Path.Combine(bdir, rel), Path.Combine(appDir, rel)); } catch { failed.Add(rel); }
+                try { CopyRetry(Path.Combine(bdir, rel), dest(rel)); } catch { failed.Add(rel); }
             foreach (var rel in created)
-                try { File.Delete(Path.Combine(appDir, rel)); } catch { }
+                try { File.Delete(dest(rel)); } catch { }
             return failed.Count == 0 ? null : "Couldn't put back: " + string.Join(", ", failed) + ". The old files are in " + bdir;
         }
 
@@ -522,11 +535,13 @@ namespace Minibar
         }
 
         // ------------------------------------------------------------ Minibar updating itself
-        // A running exe can be renamed but not overwritten: Minibar.exe -> Minibar.old.exe, new files in, start the new one, quit.
+        // A running exe can be renamed but not overwritten: the running exe -> Minibar.old.exe, the new one in under the
+        // SAME name (so "Minibar (1).exe" and his shortcuts keep working), start it, quit. If starting fails, everything goes back.
         public static void SelfUpdate(AppInfo self, Action<string> progress)
         {
             var rel = self.Rel;
             if (rel?.AssetUrl == null) throw new Exception("There's nothing to download.");
+            if (Apps.InTemp(self.Exe)) throw new Exception("Minibar is running from inside the zip. Extract it to a folder first (or use Minibar-Setup), then update.");
             lock (installGate)
             {
                 string work = Path.Combine(Root, "updates", "Minibar-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
@@ -535,36 +550,84 @@ namespace Minibar
                 {
                     string payload = Prepare(self.Def, rel, work, progress);
                     string exe = self.Exe, dir = Path.GetDirectoryName(exe), old = Path.Combine(dir, "Minibar.old.exe");
+                    var plan = SelfFiles(payload, exe);
                     progress("Installing…");
                     try { if (File.Exists(old)) File.Delete(old); } catch { }
+                    if (File.Exists(old)) old = Path.Combine(dir, "Minibar.old-" + DateTime.Now.Ticks + ".exe");
                     File.Move(exe, old);
                     var done = new List<Tuple<string, string>>();   // (dest, backup or null)
+                    void Undo()
+                    {
+                        foreach (var t in done) try { if (t.Item2 != null) File.Copy(t.Item2, t.Item1, true); else File.Delete(t.Item1); } catch { }
+                        foreach (var t in done) try { if (t.Item2 != null) File.Delete(t.Item2); } catch { }
+                        try { if (File.Exists(exe)) File.Delete(exe); } catch { }
+                        try { File.Move(old, exe); } catch (Exception ex) { Log.Crash(ex); }
+                    }
                     try
                     {
-                        foreach (var r in Files(payload))
+                        foreach (var f in plan)
                         {
-                            string dest = Path.Combine(dir, r);
-                            if (Apps.SameFile(dest, exe)) { File.Copy(Path.Combine(payload, r), dest, false); done.Add(Tuple.Create(dest, (string)null)); continue; }
+                            string src = Path.Combine(payload, f.Item1), dest = f.Item2;
+                            if (Apps.SameFile(dest, exe)) { File.Copy(src, dest, false); done.Add(Tuple.Create(dest, (string)null)); continue; }
                             string bak = File.Exists(dest) ? dest + ".minibar-bak" : null;
                             if (bak != null) File.Copy(dest, bak, true);
                             Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                            File.Copy(Path.Combine(payload, r), dest, true);
+                            File.Copy(src, dest, true);
                             done.Add(Tuple.Create(dest, bak));
                         }
+                        // start the file that was really written, and make sure it stays up
+                        if (!File.Exists(exe)) throw new FileNotFoundException("The new Minibar wasn't written.", exe);
+                        string args = "--after-update " + Process.GetCurrentProcess().Id;
+                        if (SelfStartOverride != null) SelfStartOverride(exe, args);
+                        else
+                            using (var p = Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false, WorkingDirectory = dir }))
+                            {
+                                if (p == null) throw new Exception("The new Minibar didn't start.");
+                                // it waits for this one to close, so exiting this early means it crashed
+                                if (p.WaitForExit(1500)) throw new Exception("The new Minibar closed right away (exit code " + p.ExitCode + ").");
+                            }
                     }
                     catch
                     {
-                        foreach (var t in done) try { if (t.Item2 != null) File.Copy(t.Item2, t.Item1, true); else File.Delete(t.Item1); } catch { }
-                        try { if (!File.Exists(exe)) File.Move(old, exe); } catch { }
+                        Undo();
                         throw;
                     }
                     foreach (var t in done) try { if (t.Item2 != null) File.Delete(t.Item2); } catch { }
-                    string args = "--after-update " + Process.GetCurrentProcess().Id;
-                    if (SelfStartOverride != null) SelfStartOverride(exe, args);
-                    else Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false, WorkingDirectory = dir })?.Dispose();
                 }
                 finally { try { Directory.Delete(work, true); } catch { } }
             }
+        }
+
+        // which files of the release go where. Minibar.exe goes in under the running exe's real name.
+        // In Minibar's own folder (named Minibar, or the setup's install folder) the rest comes along too;
+        // a loose Minibar.exe (Downloads, Desktop) only gets its exe and its own .config if it already has one,
+        // so nobody's README.txt in Downloads is ever overwritten.
+        public static List<Tuple<string, string>> SelfFiles(string payload, string exe)
+        {
+            string dir = Path.GetDirectoryName(exe);
+            bool own = OwnFolder(dir);
+            var list = new List<Tuple<string, string>>();
+            foreach (var r in Files(payload))
+            {
+                if (r.Equals("Minibar.exe", StringComparison.OrdinalIgnoreCase)) list.Add(Tuple.Create(r, exe));
+                else if (r.Equals("Minibar.exe.config", StringComparison.OrdinalIgnoreCase))
+                {
+                    string cfg = exe + ".config";
+                    if (own || File.Exists(cfg)) list.Add(Tuple.Create(r, cfg));
+                }
+                else if (own) list.Add(Tuple.Create(r, Path.Combine(dir, r)));
+            }
+            return list;
+        }
+
+        static bool OwnFolder(string dir)
+        {
+            try
+            {
+                if (Path.GetFileName(dir.TrimEnd('\\', '/')).Equals("Minibar", StringComparison.OrdinalIgnoreCase)) return true;
+                return InstallInfo.IsInstallDir(dir);
+            }
+            catch { return false; }
         }
 
         public static void CleanAfterSelfUpdate()

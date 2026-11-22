@@ -91,6 +91,10 @@ namespace Minibar
         [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
         [DllImport("user32.dll")] static extern int GetWindowThreadProcessId(IntPtr h, out int pid);
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
+        static readonly IntPtr HWND_MESSAGE = new IntPtr(-3);
+
+        // top-level windows and message-only windows (EnumWindows skips those; a tray icon is often owned by one)
         public static List<IntPtr> WindowsOf(ICollection<int> pids)
         {
             var list = new List<IntPtr>();
@@ -104,7 +108,31 @@ namespace Minibar
                 }, IntPtr.Zero);
             }
             catch { }
+            try
+            {
+                IntPtr h = IntPtr.Zero;
+                for (int guard = 0; guard < 20000; guard++)
+                {
+                    h = FindWindowEx(HWND_MESSAGE, h, null, null);
+                    if (h == IntPtr.Zero) break;
+                    GetWindowThreadProcessId(h, out int pid);
+                    if (pids.Contains(pid) && !list.Contains(h)) list.Add(h);
+                }
+            }
+            catch { }
             return list;
+        }
+
+        // false only when the process is there but Minibar isn't allowed to close it (it runs as admin)
+        public static bool CanTerminate(int pid)
+        {
+            try
+            {
+                IntPtr h = OpenProcess(0x0001 /* PROCESS_TERMINATE */, false, pid);
+                if (h != IntPtr.Zero) { CloseHandle(h); return true; }
+                return Marshal.GetLastWin32Error() != 5;   // 5 = access denied; anything else: gone
+            }
+            catch { return true; }
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -127,7 +155,9 @@ namespace Minibar
         }
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern bool Shell_NotifyIcon(int msg, ref NOTIFYICONDATA d);
 
-        // a force-closed app leaves its tray icon behind until the mouse passes over it; remove it ourselves
+        // a force-closed app leaves its tray icon behind until the mouse passes over it; remove it ourselves.
+        // Matches icons added by window + id (WinForms NotifyIcon, and our own Shell_NotifyIcon code with small ids);
+        // an icon added with a GUID (NIF_GUID) can't be removed this way, so apps should keep closing cleanly with --exit.
         public static void RemoveTrayIcons(IEnumerable<IntPtr> windows)
         {
             foreach (var h in windows)
@@ -147,7 +177,9 @@ namespace Minibar
         static extern int PrivateExtractIcons(string file, int index, int cx, int cy, IntPtr[] icons, int[] ids, int count, int flags);
 
         // test hook: lets the harness hand in icon frames where user32 isn't available
+#pragma warning disable CS0649
         public static Func<string, int, Bitmap> IconSource;
+#pragma warning restore CS0649
 
         static Bitmap RawIcon(string path, int size)
         {
