@@ -25,7 +25,7 @@ namespace Minibar
         public string Highlights;       // the line under the name: what the app is best at
         public string InfoTitle, Info;   // the (i) note on the card (Juice: which devices work)
         public bool WaitForWork;         // Pour: an update waits while it has a download running (yt-dlp/ffmpeg under it)
-        public bool NeedsAdmin;          // Fizz: runs as admin, so closing it from Minibar needs one admin prompt
+        public bool NeedsAdmin;          // Fizz: runs as admin, so force-closing it (when --exit didn't work within 4 s) needs an admin prompt
     }
 
     static class Catalog
@@ -496,7 +496,8 @@ namespace Minibar
                     }
                     catch (Win32Exception ex) when (ex.NativeErrorCode == 740)
                     {
-                        // an admin app (Fizz) can only be asked from an admin prompt: that's the one prompt
+                        // only for an exe whose manifest demands admin. Fizz 1.1+ is asInvoker and its hub accepts
+                        // --exit from a non-admin process, so it never gets here: no prompt for a clean close.
                         RunElevated(a.Exe, "--exit", Path.GetDirectoryName(a.Exe));
                     }
                     for (int i = 0; i < 40 && StillRunning(pids); i++) System.Threading.Thread.Sleep(100);

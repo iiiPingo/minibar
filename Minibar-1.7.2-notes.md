@@ -10,7 +10,7 @@ All 13 fixes are in as Minibar 1.7.2, pushed to `claude/awesome-carson-ckvizy` (
 - **Opened from inside the zip:** Minibar says so and installs apps into `%LOCALAPPDATA%\Programs` instead of Temp. It asks to be extracted before it updates itself.
 - **Restore and Auto:** after "Restore vX", Auto won't reinstall the version you just left. It waits for the next release; clicking Update still works.
 - **Pour's queued update** now also goes in while Minibar is minimized or in the tray.
-- **Stopping apps:** Fizz is asked to close cleanly from one admin prompt instead of being force-killed, and other apps no longer trigger a surprise admin prompt.
+- **Stopping apps:** Fizz closes cleanly with no admin prompt; the prompt only appears if Fizz is still open after 4 seconds and has to be force-closed. Other apps no longer trigger a surprise admin prompt.
 - **Closing Minibar during an update** finishes the update first (window hidden), then closes. The setup also waits for a running update instead of killing Minibar halfway through.
 - **Smaller fixes:** leftover tray icons, a settings restore that could delete saved old versions, a settings race on the Start with Windows switch, and less work on every repaint.
 
@@ -20,7 +20,7 @@ All 13 fixes are in as Minibar 1.7.2, pushed to `claude/awesome-carson-ckvizy` (
 
 ## Still to check on real Windows
 
-- **Fizz's clean close:** Stop on Fizz should show one admin prompt and close it cleanly. This assumes Fizz's manifest requires admin.
+- **Fizz's clean close:** Stop on Fizz should close it with no admin prompt (Fizz is asInvoker and its hub accepts `--exit` from a non-admin process).
 - **Tray icons:** stop an old app that gets force-closed and see that its tray icon disappears.
 - **Zip detection:** open Minibar from inside the zip and check the warning appears, then try Install.
 - **Renamed exes:** a real `Pulp (2).exe` in Downloads should show as found and running, and a renamed `Minibar (1).exe` should update to a newer test release.

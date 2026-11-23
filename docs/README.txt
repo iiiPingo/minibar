@@ -104,8 +104,8 @@ NEW IN 1.7.2
 - Restore + Auto: after "Restore vX", Auto no longer puts the version you left straight back.
   It waits for the next release (Update still works if you click it).
 - Pour's "updates after downloads finish" now also goes in while Minibar is minimized.
-- Fizz closes cleanly when you press Stop or update it (one admin prompt), instead of being
-  force-closed.
+- Fizz closes cleanly when you press Stop or update it, with no admin prompt. The admin
+  prompt only shows if Fizz is still open 4 seconds later and has to be force-closed.
 - Stopping an app no longer shows a surprise admin prompt.
 - Closing Minibar while an update is running: it finishes the update first (hidden), then
   closes. The setup waits for it too, instead of closing Minibar halfway.
