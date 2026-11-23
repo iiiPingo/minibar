@@ -13,7 +13,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <!-- same version as Minibar (build.sh passes -p:Version=...) -->
-    <Version>1.7.2</Version>
+    <Version>1.8.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Minibar Setup</Product>
     <AssemblyTitle>Minibar Setup</AssemblyTitle>
@@ -34,9 +34,13 @@
     <Compile Include="*.cs" />
     <Compile Include="..\src\Theme.cs" />
     <Compile Include="..\src\Controls.cs" />
+    <!-- Lexend (SIL Open Font License 1.1, see src/fonts/OFL.txt) -->
+    <EmbeddedResource Include="..\src\fonts\Lexend-Medium.ttf" LogicalName="fonts.Lexend-Medium.ttf" />
+    <EmbeddedResource Include="..\src\fonts\Lexend-Bold.ttf" LogicalName="fonts.Lexend-Bold.ttf" />
     <EmbeddedResource Include="..\src\minibar.ico" LogicalName="minibar.ico" />
     <EmbeddedResource Include="..\src\bin\Release\net48\Minibar.exe" LogicalName="payload/Minibar.exe" />
     <EmbeddedResource Include="..\src\bin\Release\net48\Minibar.exe.config" LogicalName="payload/Minibar.exe.config" />
     <EmbeddedResource Include="..\docs\README.txt" LogicalName="payload/README.txt" />
+    <EmbeddedResource Include="..\src\fonts\OFL.txt" LogicalName="payload/Lexend-OFL.txt" />
   </ItemGroup>
 </Project>

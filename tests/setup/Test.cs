@@ -39,7 +39,7 @@ static class Test
         string settingsBefore = File.ReadAllText(Path.Combine(Inst.DataDir, "settings.ini"));
 
         byte[] exe = Res("payload/Minibar.exe");
-        Ok(Inst.PayloadVersion == "1.7.2", "payload version 1.7 (" + Inst.PayloadVersion + ")");
+        Ok(Inst.PayloadVersion == "1.8", "payload version 1.7 (" + Inst.PayloadVersion + ")");
         Ok(Inst.InstalledVersion == null, "nothing installed at first");
 
         // 1. fresh install
@@ -48,12 +48,12 @@ static class Test
         Ok(File.Exists(Path.Combine(Inst.Dir, "Minibar.exe.config")) && File.Exists(Path.Combine(Inst.Dir, "README.txt")), "fresh: config + README");
         Ok(SameBytes(Inst.Uninstaller, File.ReadAllBytes(fakeSetup)), "fresh: uninstaller is a copy of the setup");
         Ok(!Directory.GetFiles(Inst.Dir).Any(f => f.EndsWith(".setup-new") || f.Contains(".old")), "fresh: no temp/old files left");
-        Ok(Inst.InstalledVersion == "1.7.2", "fresh: installed version reads 1.7.0 (" + Inst.InstalledVersion + ")");
+        Ok(Inst.InstalledVersion == "1.8", "fresh: installed version reads 1.7.0 (" + Inst.InstalledVersion + ")");
         using (var k = Registry.CurrentUser.OpenSubKey(Inst.RegKey))
         {
             Ok(k != null, "registry: uninstall key exists");
             Ok(k?.GetValue("DisplayName") as string == "Minibar", "registry: DisplayName");
-            Ok(k?.GetValue("DisplayVersion") as string == "1.7.2", "registry: DisplayVersion");
+            Ok(k?.GetValue("DisplayVersion") as string == "1.8", "registry: DisplayVersion");
             Ok(k?.GetValue("InstallLocation") as string == Inst.Dir, "registry: InstallLocation");
             Ok((k?.GetValue("UninstallString") as string ?? "").Contains("Uninstall Minibar.exe"), "registry: UninstallString");
             Ok(k?.GetValue("DisplayIcon") as string == Inst.Exe + ",0", "registry: DisplayIcon");
@@ -130,6 +130,8 @@ static class Test
     // offscreen renders of each screen for a look
     static int Render(string outDir)
     {
+        // Mono doesn't draw memory-loaded fonts in controls: preview with the installed Lexend (~/.fonts) instead
+        Minibar.AppFonts.UseInstalled("Lexend Medium", "Lexend");
         Directory.CreateDirectory(outDir);
         string root = Path.Combine(Path.GetTempPath(), "mbsetup-render");
         Inst.Dir = Path.Combine(root, "Programs", "Minibar"); Inst.DesktopLink = Path.Combine(root, "d.lnk");

@@ -125,8 +125,9 @@ namespace Minibar
             else if (st == UpdState.Available && !a.Updating)
             {
                 bool h = Hov(a, "update");
-                string t = a.Queued ? (h ? "Cancel update" : "Updates after downloads finish") : "Update to v" + a.Rel.Label;
-                int bw = TextW(g, a.Queued ? "Updates after downloads finish" : t, fBtn) + S(32);
+                // short here: the row also carries the name, the pill and "What's new" (Lexend is wider than Segoe)
+                string t = a.Queued ? (h ? "Cancel update" : "After downloads finish") : "Update to v" + a.Rel.Label;
+                int bw = TextW(g, a.Queued ? "After downloads finish" : t, fBtn) + S(32);
                 var br = new Rectangle(right - bw, cy, bw, S(32));
                 if (a.Queued) Theme.Fill(g, br, Color.FromArgb(h ? 60 : 34, Theme.Accent), S(7));
                 else Theme.Fill(g, br, h ? Theme.AccentHover : Theme.Accent, S(7));
@@ -134,9 +135,12 @@ namespace Minibar
                 Hit(br, "update", a);
                 right = br.X - S(8);
             }
-            if (a.Backup != null && a.Busy == null)
-                right -= Chip(g, a, "rollback", "Restore " + (a.BackupLabel ?? "previous"), right, cy) + S(4);
-            if (a.Rel?.Repo != null && a.Rel.Problem != "missing")
+            // the optional chips only where they fit, never over the name and its pill
+            bool Fits(string text) => right - (TextW(g, text, fChip) + S(24)) >= pr.Right + S(16);
+            string restore = "Restore " + (a.BackupLabel ?? "previous");
+            if (a.Backup != null && a.Busy == null && Fits(restore))
+                right -= Chip(g, a, "rollback", restore, right, cy) + S(4);
+            if (a.Rel?.Repo != null && a.Rel.Problem != "missing" && Fits("What's new"))
                 right -= Chip(g, a, "notes", "What's new", right, cy) + S(4);
 
             // second line: what you have and what GitHub has (or the problem)
@@ -149,9 +153,10 @@ namespace Minibar
             else if (a.Rel.Problem != null) gh = a.Rel.Problem;
             else gh = "GitHub has v" + a.Rel.Label + (a.Rel.Published != null ? " (" + Updater.Nice(a.Rel.Published) + ")" : "");
             var l2 = Rectangle.FromLTRB(x, r.Y + S(44), Math.Max(x + S(40), right - S(8)), r.Y + S(66));
-            if (gh == null) TextRenderer.DrawText(g, a.Error, fSmall, l2, Theme.Red, Ux.L);
-            else if (a.Note != null && DateTime.Now < a.NoteUntil) TextRenderer.DrawText(g, a.Note, fSmall, l2, Theme.Accent, Ux.L);
-            else TextRenderer.DrawText(g, have + "   ·   " + gh, fSmall, l2, Theme.Dim, Ux.L);
+            var lf = Ux.L | TextFormatFlags.EndEllipsis;
+            if (gh == null) TextRenderer.DrawText(g, a.Error, fSmall, l2, Theme.Red, lf);
+            else if (a.Note != null && DateTime.Now < a.NoteUntil) TextRenderer.DrawText(g, a.Note, fSmall, l2, Theme.Accent, lf);
+            else TextRenderer.DrawText(g, have + "   ·   " + gh, fSmall, l2, Theme.Dim, lf);
         }
 
         // draws a ghost chip whose right edge is at `right`; returns its width

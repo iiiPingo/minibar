@@ -163,6 +163,101 @@ static class Test
         try { Directory.Delete(home, true); } catch { }
     }
 
+    // offscreen renders of every page (xvfb-run mono MinibarTests.exe render <dir>), with made-up app states.
+    // Mono doesn't draw memory-loaded fonts in controls, so this uses the installed Lexend (copy the TTFs to ~/.fonts).
+    static int Render(string outDir)
+    {
+        Directory.CreateDirectory(outDir);
+        string home = Path.Combine(Path.GetTempPath(), "mbrender-" + Guid.NewGuid().ToString("N").Substring(0, 6));
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", Path.Combine(home, "cfg"));
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(home, "local"));
+        Directory.CreateDirectory(Settings.Dir);
+        File.WriteAllText(Settings.FilePath, "checkupdates=0\nstartmenu=0\n");
+        AppFonts.UseInstalled("Lexend Medium", "Lexend");
+        Native.IconSource = (path, size) => Native.BuiltInIcon(Path.GetFileNameWithoutExtension(path).Split(' ')[0], size);
+
+        var st = Settings.Load();
+        var w = new MainWindow(st) { StartPosition = System.Windows.Forms.FormStartPosition.Manual, Location = new System.Drawing.Point(-4000, -4000) };
+        w.Show(); System.Windows.Forms.Application.DoEvents();
+
+        // made-up states: every kind of card and row
+        foreach (var a in w.AppsForTest)
+        {
+            if (a.Def.Name == "Juice") { a.Exe = null; a.Version = null; continue; }   // not installed
+            string exe = Path.Combine(home, "apps", a.Def.Name, a.Def.Name + ".exe");
+            Directory.CreateDirectory(Path.GetDirectoryName(exe)); File.WriteAllBytes(exe, FakeExe(1));
+            a.Exe = exe; a.Version = "1.3"; a.Startup = true;
+        }
+        Func<string, AppInfo> A = n => w.AppsForTest.First(x => x.Def.Name == n);
+        var rel = new Func<string, Release>(n => new Release { Repo = n.ToLowerInvariant(), Tag = "v1.4.2", AssetUrl = "https://x/" + n + ".zip", AssetName = n + ".zip", Published = "2026-11-20" });
+        var pulp = A("Pulp"); pulp.Running = true; pulp.Since = DateTime.Now.AddHours(-3).AddMinutes(-12); pulp.Pids = new List<int> { 1 }; pulp.Rel = rel("Pulp");
+        var echoa = A("Echoa"); echoa.Running = true; echoa.Since = DateTime.Now.AddMinutes(-40); echoa.Pids = new List<int> { 2 };
+        echoa.Rel = new Release { Repo = "echoa", Tag = "v1.3", Published = "2026-11-01" }; echoa.Backup = home; echoa.BackupLabel = "v1.2.5";
+        var pour = A("Pour"); pour.Running = true; pour.Since = DateTime.Now.AddDays(-1).AddHours(-2); pour.Pids = new List<int> { 3 }; pour.Rel = rel("Pour"); pour.Queued = true;
+        var fizz = A("Fizz"); fizz.Running = false; fizz.PawnIO = false; fizz.PawnSetup = "PawnIO_setup.exe"; fizz.Startup = null; fizz.StartupNote = "Set up from Fizz itself the first time.";
+        fizz.Error = "Fizz didn't close."; fizz.ErrorUntil = DateTime.Now.AddMinutes(5);
+        w.SelfForTest.Rel = new Release { Repo = "minibar", Tag = "v1.7.2", Published = "2026-11-23" };
+        foreach (var a in w.AppsForTest) a.Icon = null;
+
+        void Shot(string name, int page, int width)
+        {
+            w.ShowPageForTest(page);
+            w.ClientSize = new System.Drawing.Size(width, w.ClientSize.Height);
+            System.Windows.Forms.Application.DoEvents();
+            foreach (var a in w.AppsForTest) { if (a.Def.Name == "Pulp" || a.Def.Name == "Echoa" || a.Def.Name == "Pour") a.Running = true; }
+            using (var bmp = new System.Drawing.Bitmap(w.ClientSize.Width, w.ClientSize.Height))
+            {
+                using (var g = System.Drawing.Graphics.FromImage(bmp))
+                {
+                    // Mono's Form.DrawToBitmap leaves the page panels out: paint the form, then each visible child
+                    typeof(MainWindow).GetMethod("OnPaint", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                        .Invoke(w, new object[] { new System.Windows.Forms.PaintEventArgs(g, new System.Drawing.Rectangle(System.Drawing.Point.Empty, bmp.Size)) });
+                    // and Mono's Control.DrawToBitmap leaves children out too: draw every visible control, back to front
+                    void Draw(System.Windows.Forms.Control c, System.Drawing.Point at)
+                    {
+                        if (!c.Visible || c.Width <= 0 || c.Height <= 0) return;
+                        using (var cb = new System.Drawing.Bitmap(c.Width, c.Height)) { c.DrawToBitmap(cb, new System.Drawing.Rectangle(System.Drawing.Point.Empty, c.Size)); g.DrawImage(cb, at); }
+                        for (int i = c.Controls.Count - 1; i >= 0; i--)
+                        {
+                            var k = c.Controls[i];
+                            Draw(k, new System.Drawing.Point(at.X + k.Left, at.Y + k.Top));
+                        }
+                    }
+                    for (int i = w.Controls.Count - 1; i >= 0; i--) Draw(w.Controls[i], w.Controls[i].Location);
+                }
+                bmp.Save(Path.Combine(outDir, name + ".png"));
+            }
+        }
+        // the whole card list at once (the Fizz card with its notice is below the fold)
+        void Cards(string name, int width)
+        {
+            var l = w.ListForTest;
+            var old = l.Size;
+            l.Size = new System.Drawing.Size(width, 1400);
+            foreach (var a in w.AppsForTest) { if (a.Def.Name == "Pulp" || a.Def.Name == "Echoa" || a.Def.Name == "Pour") a.Running = true; }
+            using (var bmp = new System.Drawing.Bitmap(l.Width, l.Height))
+            {
+                l.DrawToBitmap(bmp, new System.Drawing.Rectangle(System.Drawing.Point.Empty, bmp.Size));
+                bmp.Save(Path.Combine(outDir, name + ".png"));
+            }
+            l.Size = old;
+        }
+        int normal = w.ClientSize.Width, narrow = w.MinimumSize.Width - (w.Width - w.ClientSize.Width);
+        Shot("1-apps", 0, normal);
+        Shot("2-updates", 1, normal);
+        Shot("3-settings", 2, normal);
+        Cards("4-cards", w.ListForTest.Width);
+        Shot("5-apps-narrow", 0, narrow);
+        Shot("6-updates-narrow", 1, narrow);
+        Shot("7-settings-narrow", 2, narrow);
+        Cards("8-cards-narrow", w.ListForTest.Width);
+        fizz.PawnIO = true; fizz.Error = null;
+        Cards("9-cards-pawnio-installed", w.ListForTest.Width);
+        w.Dispose();
+        try { Directory.Delete(home, true); } catch { }
+        return 0;
+    }
+
     static string Rel(params string[] names) =>
         "{\"tag_name\":\"v1.6.4\",\"published_at\":\"2026-11-22T16:00:00Z\",\"assets\":[" +
         string.Join(",", names.Select(n => "{\"name\":\"" + n + "\",\"browser_download_url\":\"https://github.com/iiiPingo/minibar/releases/download/v1.6.4/" + n + "\"}")) + "]}";
@@ -170,6 +265,7 @@ static class Test
     static int Main(string[] args)
     {
         if (args.Length > 1 && args[0] == "e2e") return E2E(args[1]);
+        if (args.Length > 1 && args[0] == "render") return Render(args[1]);
 
         // Pour waits only while something it started is still running (console hosts don't count)
         var procs = new List<Tuple<int, int, string>> {
@@ -242,6 +338,15 @@ static class Test
         Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(InstallInfo.Key, false);
 
         Fixes172(home);
+
+        // 1.8.0: Lexend built in (Medium for text, Bold for names/headings/buttons; the Bold file has only a Bold face)
+        Ok(AppFonts.Medium != null && AppFonts.Bold != null, "Lexend loads from the exe's resources");
+        // (Windows names them "Lexend Medium" and "Lexend"; Mono's fontconfig calls both "Lexend")
+        Ok((AppFonts.Medium?.Name ?? "").StartsWith("Lexend") && AppFonts.Bold?.Name == "Lexend", "families: " + AppFonts.Medium?.Name + " / " + AppFonts.Bold?.Name);
+        using (var f1 = Theme.Ui(10f)) Ok(f1.FontFamily.Name.StartsWith("Lexend") && !f1.Bold, "Theme.Ui is Lexend Medium, regular style (" + f1.FontFamily.Name + ", " + f1.Style + ")");
+        using (var f2 = Theme.UiSemi(10f)) Ok(f2.FontFamily.Name == "Lexend" && f2.Bold, "Theme.UiSemi is Lexend Bold (" + f2.FontFamily.Name + ", " + f2.Style + ")");
+        using (var f3 = Theme.UiTitle(15f)) Ok(f3.FontFamily.Name == "Lexend" && f3.Bold, "Theme.UiTitle is Lexend Bold");
+        Ok(Catalog.All.Where(x => x.Openable).Select(x => x.Name).OrderBy(x => x).SequenceEqual(new[] { "Fizz", "Pulp" }), "only Fizz and Pulp get Start-opens + Open");
         try { Directory.Delete(home, true); } catch { }
         Console.WriteLine(checks + " checks, " + fails + " failed");
         return fails == 0 ? 0 : 1;

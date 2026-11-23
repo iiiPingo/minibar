@@ -65,13 +65,18 @@ namespace Minibar
         }
 
         public static readonly string IconFont = FontExists("Segoe Fluent Icons") ? "Segoe Fluent Icons" : "Segoe MDL2 Assets";
+        // fallback when Lexend can't be loaded
         static readonly string UiFamily = FontExists("Segoe UI Variable Text") ? "Segoe UI Variable Text" : "Segoe UI";
         static readonly string UiSemiFamily = FontExists("Segoe UI Variable Text Semibold") ? "Segoe UI Variable Text Semibold"
             : FontExists("Segoe UI Semibold") ? "Segoe UI Semibold" : null;
-        public static Font Ui(float size) => new Font(UiFamily, size);
-        public static Font UiSemi(float size) => UiSemiFamily != null ? new Font(UiSemiFamily, size) : new Font(UiFamily, size, FontStyle.Bold);
         static readonly string UiDisplaySemi = FontExists("Segoe UI Variable Display Semibold") ? "Segoe UI Variable Display Semibold" : null;
-        public static Font UiTitle(float size) => UiDisplaySemi != null ? new Font(UiDisplaySemi, size) : UiSemi(size);
+
+        // Lexend (built into the exe): Medium for normal text, Bold for names, headings and buttons
+        public static Font Ui(float size) => AppFonts.Make(AppFonts.Medium, size, false) ?? new Font(UiFamily, size);
+        public static Font UiSemi(float size) => AppFonts.Make(AppFonts.Bold, size, true)
+            ?? (UiSemiFamily != null ? new Font(UiSemiFamily, size) : new Font(UiFamily, size, FontStyle.Bold));
+        public static Font UiTitle(float size) => AppFonts.Make(AppFonts.Bold, size, true)
+            ?? (UiDisplaySemi != null ? new Font(UiDisplaySemi, size) : UiSemi(size));
 
         // Segoe Fluent Icons / MDL2 glyphs
         public const string GInfo = "\uE946", GPlay = "\uE768", GStop = "\uE71A", GFolder = "\uE8B7", GData = "\uE8F1", GLog = "\uE8A5",
@@ -154,6 +159,72 @@ namespace Minibar
                 g.InterpolationMode = old;
             }
             catch { Fill(g, r, Card, r.Width * 0.24f); }
+        }
+    }
+
+    // ---------------------------------------------------------------- Lexend, built into the exe (nothing installed on the PC)
+    // Like Fizz's AppFonts: one PrivateFontCollection per file (GDI+ Font objects) plus AddFontMemResourceEx
+    // (so TextRenderer / GDI finds the same faces). The memory stays allocated for the life of the process.
+    // Lexend-Medium.ttf is family "Lexend Medium" (Regular style); Lexend-Bold.ttf is family "Lexend" with only
+    // a Bold face, so it must be created with FontStyle.Bold. Anything failing: null, and Theme falls back to Segoe UI.
+    static class AppFonts
+    {
+        public static FontFamily Medium, Bold;
+        static readonly System.Drawing.Text.PrivateFontCollection[] pfc =
+            { new System.Drawing.Text.PrivateFontCollection(), new System.Drawing.Text.PrivateFontCollection() };
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")] static extern IntPtr AddFontMemResourceEx(IntPtr pb, uint cb, IntPtr pdv, ref uint pcFonts);
+
+        static AppFonts()
+        {
+            try
+            {
+                bool windows = Environment.OSVersion.Platform == PlatformID.Win32NT;
+                var names = new[] { "fonts.Lexend-Medium.ttf", "fonts.Lexend-Bold.ttf" };
+                for (int i = 0; i < names.Length; i++)
+                {
+                    byte[] data;
+                    using (var st = typeof(AppFonts).Assembly.GetManifestResourceStream(names[i]))
+                    {
+                        if (st == null) return;
+                        data = new byte[st.Length];
+                        int read = 0;
+                        while (read < data.Length) { int n = st.Read(data, read, data.Length - read); if (n <= 0) break; read += n; }
+                    }
+                    IntPtr mem = System.Runtime.InteropServices.Marshal.AllocCoTaskMem(data.Length);   // never freed: GDI and GDI+ read from it
+                    System.Runtime.InteropServices.Marshal.Copy(data, 0, mem, data.Length);
+                    pfc[i].AddMemoryFont(mem, data.Length);
+                    if (windows)
+                    {
+                        uint count = 0;
+                        if (AddFontMemResourceEx(mem, (uint)data.Length, IntPtr.Zero, ref count) == IntPtr.Zero) return;
+                    }
+                }
+                if (pfc[0].Families.Length == 0 || pfc[1].Families.Length == 0) return;
+                Medium = pfc[0].Families[0];
+                Bold = pfc[1].Families[0];
+            }
+            catch { Medium = Bold = null; }
+        }
+
+        // render harness only (Mono doesn't draw memory fonts in controls): use the installed families instead
+        public static void UseInstalled(string medium, string bold)
+        {
+            try { Medium = new FontFamily(medium); Bold = new FontFamily(bold); } catch { }
+        }
+
+        // the face each file has: Medium as Regular, Bold as Bold (new Font("Lexend", size) would throw: no Regular face)
+        public static Font Make(FontFamily f, float size, bool bold)
+        {
+            if (f == null) return null;
+            try
+            {
+                var want = bold ? FontStyle.Bold : FontStyle.Regular;
+                var other = bold ? FontStyle.Regular : FontStyle.Bold;
+                var style = f.IsStyleAvailable(want) ? want : f.IsStyleAvailable(other) ? other : (FontStyle?)null;
+                return style == null ? null : new Font(f, size, style.Value);
+            }
+            catch { return null; }
         }
     }
 

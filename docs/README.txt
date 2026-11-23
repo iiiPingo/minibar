@@ -1,4 +1,4 @@
-MINIBAR 1.7.2
+MINIBAR 1.8.0
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 INSTALL (two ways, both update themselves the same way)
@@ -89,6 +89,13 @@ FILES
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
 %LOCALAPPDATA%\Programs\Minibar Minibar itself, when installed with the setup
+
+NEW IN 1.8.0
+- New font: Lexend, a bit bolder and easier to read. It's built into Minibar, nothing gets
+  installed on your PC.
+- Fizz and Pulp: Start now also opens them (Pulp's panel, Fizz's settings), so you can see
+  they started. While they're running, an Open button brings their window back.
+- Shorter Fizz note: one line about PawnIO and FACEIT.
 
 NEW IN 1.7.2
 - Renamed downloads work: "Pulp (2).exe" or "Minibar (1).exe" (what Discord and browsers
@@ -196,6 +203,10 @@ NEW IN 1.2
 - Stop and updates ask an app to close cleanly ("<App>.exe --exit") when the app is new
   enough to understand it (Pulp 1.3, Echoa 1.6, Pour 1.2, Fizz 1.1, Juice 1.1), and only
   force-close it if that doesn't work.
+
+THIRD-PARTY
+Lexend font (Medium and Bold), Copyright 2018 The Lexend Project Authors, SIL Open Font
+License 1.1 (Lexend-OFL.txt next to Minibar.exe).
 
 BUILD
 source\ is C# for .NET Framework 4.8. On Windows: dotnet build -c Release

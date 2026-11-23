@@ -25,6 +25,7 @@ namespace Minibar
         public string Highlights;       // the line under the name: what the app is best at
         public string InfoTitle, Info;   // the (i) note on the card (Juice: which devices work)
         public bool WaitForWork;         // Pour: an update waits while it has a download running (yt-dlp/ffmpeg under it)
+        public bool Openable;            // Fizz, Pulp: Start also shows the app's window, and an Open button brings it back
         public bool NeedsAdmin;          // Fizz: runs as admin, so force-closing it (when --exit didn't work within 4 s) needs an admin prompt
     }
 
@@ -56,9 +57,9 @@ namespace Minibar
                        "Not yet: Razer, Corsair, HyperX and other brands' own USB receivers. Right-click Juice > Diagnostics shows everything it can see."
             },
             new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists", Repos = new[] { "pour" }, ExitSince = new Version(1, 2), WaitForWork = true },
-            new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3) },
+            new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3), Openable = true },
             // Fizz last: its card can carry the PawnIO / anti-cheat notice
-            new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1), NeedsAdmin = true },
+            new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1), NeedsAdmin = true, Openable = true },
         };
 
         public static readonly AppDef Minibar = new AppDef { Name = "Minibar", Blurb = "This app", Self = true, DataDir = e => Settings.Dir, Repos = new[] { "minibar" } };
@@ -446,6 +447,29 @@ namespace Minibar
             if (!picked && !n.StartsWith(a.Def.Name, StringComparison.OrdinalIgnoreCase)) return false;
             string path = Native.ProcessPath(p.Id);
             return path != null && (SameFile(path, a.Exe) || IsAppExe(path, a.Def));
+        }
+
+        // Start from the card for an app that shows nothing when it starts: start it and show its window
+        // (Pulp: without --tray it opens its panel; Fizz: started, then asked to open its settings once it's up)
+        public static void StartAndOpen(AppInfo a)
+        {
+            if (!a.Def.Openable) { Start(a); return; }
+            if (a.Def.TaskName == null) { Start(a, ""); return; }
+            Start(a);
+            // Fizz may sit at an admin prompt first; once it runs, give it a moment to set up, then ask it to open
+            for (int i = 0; i < 300 && PidsNow(a).Count == 0; i++) System.Threading.Thread.Sleep(100);
+            if (PidsNow(a).Count == 0) return;
+            System.Threading.Thread.Sleep(3000);
+            Open(a);
+        }
+
+        // brings a running app's window up: a second "<App>.exe" (no args) tells the running one to show itself
+        // (Pulp: its panel; Fizz: its settings, without an admin prompt)
+        public static void Open(AppInfo a)
+        {
+            string exe = a.OtherCopy ?? a.Exe;
+            if (exe == null || !File.Exists(exe)) throw new InvalidOperationException("Minibar can't find " + a.Def.Name + ".exe.");
+            Process.Start(new ProcessStartInfo(exe, "") { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe) })?.Dispose();
         }
 
         // the processes of this app right now (any copy, renamed ones too)

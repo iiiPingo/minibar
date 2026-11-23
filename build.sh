@@ -8,6 +8,7 @@ dotnet build src -c Release -nologo -v q
 dotnet build setup -c Release -nologo -v q -p:Version="$V"
 rm -rf release && mkdir -p release/Minibar
 cp src/bin/Release/net48/Minibar.exe src/bin/Release/net48/Minibar.exe.config docs/README.txt release/Minibar/
+cp src/fonts/OFL.txt release/Minibar/Lexend-OFL.txt
 cp setup/bin/Release/net48/Minibar-Setup.exe "release/Minibar-Setup-$V.exe"
 cp src/bin/Release/net48/Minibar.exe release/Minibar.exe
 (cd release && rm -f "Minibar-$V.zip" && zip -qr "Minibar-$V.zip" Minibar)

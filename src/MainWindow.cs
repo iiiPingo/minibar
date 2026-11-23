@@ -281,12 +281,12 @@ namespace Minibar
             trayT.Changed += () => { st.MinimizeToTray = trayT.On; st.Save(); };
             p.Controls.Add(trayT);
             y += S(56);
-            var updT = new Toggle("Check for updates when Minibar opens", s) { Location = new Point(0, y), Width = w, Hint = "Asks GitHub at most once an hour. Nothing installs unless you click Update or turn on Auto.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            var updT = new Toggle("Check for updates when Minibar opens", s) { Location = new Point(0, y), Width = w, Hint = "At most once an hour. Nothing installs unless you click Update or use Auto.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             updT.On = st.CheckUpdates;
             updT.Changed += () => { st.CheckUpdates = updT.On; st.Save(); };
             p.Controls.Add(updT);
             y += S(56);
-            var smT = new Toggle("Show the apps in Windows search", s) { Location = new Point(0, y), Width = w, Hint = "Start menu shortcuts for each app, so typing \"Pulp\" in search opens it. Off removes them.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            var smT = new Toggle("Show the apps in Windows search", s) { Location = new Point(0, y), Width = w, Hint = "Start menu shortcuts, so typing \"Pulp\" in search opens it. Off removes them.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             smT.On = st.StartMenu;
             smT.Changed += () => { st.StartMenu = smT.On; st.Save(); StartMenu.Reset(); SyncStartMenu(); };
             p.Controls.Add(smT);
@@ -294,8 +294,8 @@ namespace Minibar
 
             Lbl(p, "Finding your apps", 0, y, w, S(24), Theme.Text, fH2);
             Lbl(p, "Minibar uses, in order: a file you picked with Locate, the running app, its start-with-Windows entry, " +
-                   "then the newest copy in your Claude Projects folder or Downloads. Backups are skipped.", 0, y + S(26), w, S(40), Theme.Dim, fSmall);
-            y += S(74);
+                   "then the newest copy in your Claude Projects folder or Downloads. Backups are skipped.", 0, y + S(26), w, S(58), Theme.Dim, fSmall);
+            y += S(92);
             var again = new FlatBtn("Look again", s) { Location = new Point(0, y), Width = S(130) };
             again.Click += (o, e) => LookAgain();
             p.Controls.Add(again);
@@ -307,8 +307,8 @@ namespace Minibar
 
             Lbl(p, "Back up settings", 0, y, w, S(24), Theme.Text, fH2);
             Lbl(p, "One zip with the settings of every app and Minibar (link rules, device names, volumes, hotkeys...). " +
-                   "Pulp's clipboard history isn't included. Restore puts them back and restarts the apps that were open.", 0, y + S(26), w, S(40), Theme.Dim, fSmall);
-            y += S(74);
+                   "Pulp's clipboard history isn't included. Restore puts them back and restarts the apps that were open.", 0, y + S(26), w, S(58), Theme.Dim, fSmall);
+            y += S(92);
             var bk = new FlatBtn("Back up…", s) { Location = new Point(0, y), Width = S(130) };
             bk.Click += (o, e) => BackupSettings();
             p.Controls.Add(bk);
@@ -320,8 +320,8 @@ namespace Minibar
             y += S(62);
 
             Lbl(p, "Minibar's own files", 0, y, w, S(24), Theme.Text, fH2);
-            Lbl(p, "settings.ini and crash.log in %APPDATA%\\Minibar; old app versions in %LOCALAPPDATA%\\Minibar\\backup. Closing Minibar quits it, so nothing runs in the background.", 0, y + S(26), w, S(40), Theme.Dim, fSmall);
-            y += S(74);
+            Lbl(p, "settings.ini and crash.log in %APPDATA%\\Minibar; old app versions in %LOCALAPPDATA%\\Minibar\\backup. Closing Minibar quits it, so nothing runs in the background.", 0, y + S(26), w, S(58), Theme.Dim, fSmall);
+            y += S(92);
             var folder = new FlatBtn("Open data folder", s) { Location = new Point(0, y), Width = S(150) };
             folder.Click += (o, e) => { try { Directory.CreateDirectory(Settings.Dir); Process.Start("explorer.exe", "\"" + Settings.Dir + "\"")?.Dispose(); } catch { } };
             p.Controls.Add(folder);
@@ -801,7 +801,10 @@ namespace Minibar
                 switch (id)
                 {
                     case "start":
-                        Background(a, "Starting…", () => { Apps.Start(a); System.Threading.Thread.Sleep(900); });
+                        Background(a, a.Def.Openable ? "Opening…" : "Starting…", () => { Apps.StartAndOpen(a); System.Threading.Thread.Sleep(900); });
+                        break;
+                    case "open":
+                        Background(a, "Opening…", () => { Apps.Open(a); System.Threading.Thread.Sleep(600); });
                         break;
                     case "stop":
                         Background(a, "Stopping…", () => Apps.Stop(a));
