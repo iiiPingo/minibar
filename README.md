@@ -31,3 +31,7 @@ dotnet build -c Release
 
 The setup carries the built Minibar.exe inside it, so build `src` first, then `dotnet build setup -c Release`.
 On Linux, `./build.sh` does both and writes the release files (zip, setup, exe) into `release/`.
+
+## Third-party
+
+- **Lexend** (Medium and Bold), the font Minibar uses, built into Minibar.exe and the setup. Copyright 2018 The Lexend Project Authors, licensed under the [SIL Open Font License 1.1](src/fonts/OFL.txt). From [Google Fonts](https://fonts.google.com/specimen/Lexend).

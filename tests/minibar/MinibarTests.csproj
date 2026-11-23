@@ -5,17 +5,21 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
     <StartupObject>Test</StartupObject>
-    <Version>1.7.1</Version>
+    <Version>1.8.0</Version>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
     <FrameworkPathOverride>/usr/lib/mono/4.8-api</FrameworkPathOverride>
     <DebugType>none</DebugType>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <Compile Include="Test.cs" />
     <Compile Include="..\..\src\*.cs" />
+    <!-- Lexend (SIL Open Font License 1.1, see src/fonts/OFL.txt) -->
+    <EmbeddedResource Include="..\..\src\fonts\Lexend-Medium.ttf" LogicalName="fonts.Lexend-Medium.ttf" />
+    <EmbeddedResource Include="..\..\src\fonts\Lexend-Bold.ttf" LogicalName="fonts.Lexend-Bold.ttf" />
     <EmbeddedResource Include="..\..\src\minibar.ico" LogicalName="minibar.ico" />
   </ItemGroup>
 </Project>

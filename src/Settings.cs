@@ -29,6 +29,8 @@ namespace Minibar
         public readonly Dictionary<string, string> RunCmd = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         // seen.<App>= the last place Minibar found each app, so it's still found after Minibar itself moves (setup, new folder)
         public readonly Dictionary<string, string> Seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // skip.<App>= a release he went back from with Restore: Auto doesn't put it back in (Update still can)
+        public readonly Dictionary<string, string> Skip = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public static Settings Load()
         {
@@ -58,6 +60,7 @@ namespace Minibar
                     else if (k.StartsWith("path.", StringComparison.OrdinalIgnoreCase) && v.Length > 0) s.Located[k.Substring(5)] = v;
                     else if (k.StartsWith("run.", StringComparison.OrdinalIgnoreCase) && v.Length > 0) s.RunCmd[k.Substring(4)] = v;
                     else if (k.StartsWith("seen.", StringComparison.OrdinalIgnoreCase) && v.Length > 0) s.Seen[k.Substring(5)] = v;
+                    else if (k.StartsWith("skip.", StringComparison.OrdinalIgnoreCase) && v.Length > 0) s.Skip[k.Substring(5)] = v;
                 }
             }
             catch (Exception ex) { Log.Crash(ex); }
@@ -71,6 +74,7 @@ namespace Minibar
             AutoUpdate.Clear(); foreach (var a in o.AutoUpdate) AutoUpdate.Add(a);
             Located.Clear(); foreach (var kv in o.Located) Located[kv.Key] = kv.Value;
             RunCmd.Clear(); foreach (var kv in o.RunCmd) RunCmd[kv.Key] = kv.Value;
+            Skip.Clear(); foreach (var kv in o.Skip) Skip[kv.Key] = kv.Value;
         }
 
         static readonly object saveGate = new object();
@@ -94,6 +98,7 @@ namespace Minibar
                 foreach (var kv in Located.OrderBy(k => k.Key)) sb.AppendLine("path." + kv.Key + "=" + kv.Value);
                 foreach (var kv in RunCmd.OrderBy(k => k.Key)) sb.AppendLine("run." + kv.Key + "=" + kv.Value);
                 foreach (var kv in Seen.OrderBy(k => k.Key)) sb.AppendLine("seen." + kv.Key + "=" + kv.Value);
+                foreach (var kv in Skip.OrderBy(k => k.Key)) sb.AppendLine("skip." + kv.Key + "=" + kv.Value);
                 string tmp = FilePath + ".tmp";
                 File.WriteAllText(tmp, sb.ToString(), new UTF8Encoding(false));
                 if (File.Exists(FilePath)) File.Replace(tmp, FilePath, null);

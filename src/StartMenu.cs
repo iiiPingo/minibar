@@ -61,6 +61,11 @@ namespace Minibar
                 Call(sc, "Save");
                 done[name] = exe;
             }
+            catch
+            {
+                // can't write it (folder blocked, AV...): don't try again every 1.5 s; Look again / the setting retries
+                done[name] = exe ?? "";
+            }
             finally { Release(sc); Release(shell); }
         }
 

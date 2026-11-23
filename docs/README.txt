@@ -1,4 +1,4 @@
-MINIBAR 1.7.1
+MINIBAR 1.8.0
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
 
 INSTALL (two ways, both update themselves the same way)
@@ -69,7 +69,8 @@ UPDATES (new in 1.1)
 HOW MINIBAR FINDS THE APPS
 In this order: a file you picked with Locate, the running app, its
 start-with-Windows entry, then the newest copy in C:\Claude Projects or
-Downloads\<App>. Backups folders and *.old.exe files are skipped.
+Downloads\<App> (or loose in Downloads, like "Pulp (2).exe"). Backups folders and
+*.old.exe files are skipped. A renamed exe counts when its version info says it's the app.
 Refresh (or F5) looks again.
 
 KEYBOARD
@@ -83,10 +84,41 @@ FILES
 %APPDATA%\Minibar\settings.ini   accent, window position, tray, checkupdates,
                                  path.<App>= (Locate), run.<App>= (startup command
                                  kept while it's off), auto.<App>=, rel.<App>= (last
-                                 release seen on GitHub)
+                                 release seen on GitHub), skip.<App>= (a release you went
+                                 back from: Auto skips it)
 %APPDATA%\Minibar\crash.log      if something goes wrong, look here
 %LOCALAPPDATA%\Minibar\backup   old versions kept by updates (3 per app)
 %LOCALAPPDATA%\Programs\Minibar Minibar itself, when installed with the setup
+
+NEW IN 1.8.0
+- New font: Lexend, a bit bolder and easier to read. It's built into Minibar, nothing gets
+  installed on your PC.
+- Fizz and Pulp: Start now also opens them (Pulp's panel, Fizz's settings), so you can see
+  they started. While they're running, an Open button brings their window back.
+- Shorter Fizz note: one line about PawnIO and FACEIT.
+
+NEW IN 1.7.2
+- Renamed downloads work: "Pulp (2).exe" or "Minibar (1).exe" (what Discord and browsers
+  save) is found, shown as running, stopped and updated like the normal name. Minibar checks
+  what the exe really is, not what it's called. Locate accepts them too.
+- Updating a renamed Minibar no longer fails with "The system cannot find the file
+  specified". It keeps its name, and if the new version can't start, the old one is put back.
+- A loose Minibar.exe (in Downloads or on the Desktop) only replaces itself when it updates.
+  Your other files there, like a README.txt, are never touched.
+- Opened Minibar straight from the zip? It says so, installs apps into
+  %LOCALAPPDATA%\Programs instead of a temporary folder, and asks you to extract it before it
+  updates itself.
+- Restore + Auto: after "Restore vX", Auto no longer puts the version you left straight back.
+  It waits for the next release (Update still works if you click it).
+- Pour's "updates after downloads finish" now also goes in while Minibar is minimized.
+- Fizz closes cleanly when you press Stop or update it, with no admin prompt. The admin
+  prompt only shows if Fizz is still open 4 seconds later and has to be force-closed.
+- Stopping an app no longer shows a surprise admin prompt.
+- Closing Minibar while an update is running: it finishes the update first (hidden), then
+  closes. The setup waits for it too, instead of closing Minibar halfway.
+- Smaller fixes: leftover tray icons after a force-close, a settings restore that could
+  delete saved old versions, settings that could be lost when switching Start with Windows,
+  less work while the window is open.
 
 NEW IN 1.7.1
 - Settings shows the plain version number (no build code after it).
@@ -171,6 +203,10 @@ NEW IN 1.2
 - Stop and updates ask an app to close cleanly ("<App>.exe --exit") when the app is new
   enough to understand it (Pulp 1.3, Echoa 1.6, Pour 1.2, Fizz 1.1, Juice 1.1), and only
   force-close it if that doesn't work.
+
+THIRD-PARTY
+Lexend font (Medium and Bold), Copyright 2018 The Lexend Project Authors, SIL Open Font
+License 1.1 (Lexend-OFL.txt next to Minibar.exe).
 
 BUILD
 source\ is C# for .NET Framework 4.8. On Windows: dotnet build -c Release

@@ -25,6 +25,8 @@ namespace Minibar
         public string Highlights;       // the line under the name: what the app is best at
         public string InfoTitle, Info;   // the (i) note on the card (Juice: which devices work)
         public bool WaitForWork;         // Pour: an update waits while it has a download running (yt-dlp/ffmpeg under it)
+        public bool Openable;            // Fizz, Pulp: Start also shows the app's window, and an Open button brings it back
+        public bool NeedsAdmin;          // Fizz: runs as admin, so force-closing it (when --exit didn't work within 4 s) needs an admin prompt
     }
 
     static class Catalog
@@ -55,9 +57,9 @@ namespace Minibar
                        "Not yet: Razer, Corsair, HyperX and other brands' own USB receivers. Right-click Juice > Diagnostics shows everything it can see."
             },
             new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists", Repos = new[] { "pour" }, ExitSince = new Version(1, 2), WaitForWork = true },
-            new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3) },
+            new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3), Openable = true },
             // Fizz last: its card can carry the PawnIO / anti-cheat notice
-            new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1) },
+            new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1), NeedsAdmin = true, Openable = true },
         };
 
         public static readonly AppDef Minibar = new AppDef { Name = "Minibar", Blurb = "This app", Self = true, DataDir = e => Settings.Dir, Repos = new[] { "minibar" } };
@@ -114,6 +116,7 @@ namespace Minibar
             catch { }
         }
         public string Backup;            // newest backup folder Minibar can restore (null = none)
+        public string BackupLabel;       // its "was=" version, read once (not on every paint)
         public string Note; public DateTime NoteUntil;   // good news for a few seconds ("Updated to v1.3")
 
         public bool Found => Exe != null;
@@ -182,11 +185,73 @@ namespace Minibar
             catch { return new Version(0, 0); }
         }
 
+        // ------------------------------------------------------------ is this file (or process) one of the apps?
+        // Never by file name alone: Discord and browsers save repeat downloads as "Pulp (2).exe". The version
+        // resource (ProductName / FileDescription / OriginalFilename) says what it really is.
+        static readonly Dictionary<string, string> productCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        static string ProductOf(string path)
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                string key = fi.FullName + "|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks;
+                lock (productCache)
+                    if (productCache.TryGetValue(key, out var hit)) return hit;
+                var v = FileVersionInfo.GetVersionInfo(path);
+                string id = string.Join("|", new[] { v.ProductName, v.FileDescription, Path.GetFileNameWithoutExtension(v.OriginalFilename ?? ""), Path.GetFileNameWithoutExtension(v.InternalName ?? "") }
+                    .Select(x => (x ?? "").Trim()));
+                lock (productCache) { if (productCache.Count > 500) productCache.Clear(); productCache[key] = id; }
+                return id;
+            }
+            catch { return null; }
+        }
+
+        // "Pulp.exe", "Pulp (2).exe", "Pulp(1) (1).exe": the names a download of Pulp.exe ends up with
+        static bool DownloadName(string file, string app) =>
+            System.Text.RegularExpressions.Regex.IsMatch(file, "^" + System.Text.RegularExpressions.Regex.Escape(app) + @"(\s*\(\d+\))*\.exe$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        public static bool IsAppExe(string path, AppDef d)
+        {
+            if (string.IsNullOrEmpty(path) || d == null) return false;
+            string file = Path.GetFileName(path);
+            if (!file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || file.IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (!File.Exists(path)) return false;
+            // its own name: always (as before; an old Echoa build may still say "Sip" inside)
+            if (file.Equals(d.Name + ".exe", StringComparison.OrdinalIgnoreCase)) return true;
+            var parts = (ProductOf(path) ?? "").Split('|');
+            // renamed: the version resource names the app, whatever the file is called
+            if (parts.Any(x => x.Equals(d.Name, StringComparison.OrdinalIgnoreCase))) return true;
+            // no version resource at all (Juice): a download-style name ("Juice (2).exe") is enough
+            return !parts.Any(x => x.Length > 0) && DownloadName(file, d.Name);
+        }
+
+        // Explorer runs an exe opened inside a zip from %TEMP%\Temp1_<zip>\: nothing installed beside it would last
+        public static bool InTemp(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path)) return false;
+                string full = Path.GetFullPath(path);
+                foreach (var t in new[] { Path.GetTempPath(), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") })
+                {
+                    if (string.IsNullOrEmpty(t)) continue;
+                    string root = Path.GetFullPath(t).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+                    if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public static string ProgramsDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
+
         // <App>.exe under C:\Claude Projects (a few levels deep, backups and .old.exe skipped) and Downloads\<App>
         // where installed apps go: beside Minibar's own folder when it has one (Downloads\Minibar -> Downloads\Pulp),
         // otherwise beside the exe itself (Minibar.exe straight in Downloads -> Downloads\Pulp)
         public static string AppsHome(string selfExe)
         {
+            if (InTemp(selfExe)) return ProgramsDir;   // opened inside the zip: never install into Temp
             string mine = Path.GetDirectoryName(selfExe ?? "") ?? "";
             if (Path.GetFileName(mine).Equals("Minibar", StringComparison.OrdinalIgnoreCase))
                 return Path.GetDirectoryName(mine) ?? mine;
@@ -201,8 +266,8 @@ namespace Minibar
                 if (depth < 0) return;
                 try
                 {
-                    string f = Path.Combine(dir, d.Name + ".exe");
-                    if (File.Exists(f)) found.Add(f);
+                    foreach (var f in Directory.GetFiles(dir, "*.exe"))
+                        if (IsAppExe(f, d)) found.Add(f);
                     foreach (var sub in Directory.GetDirectories(dir))
                     {
                         string n = Path.GetFileName(sub);
@@ -224,6 +289,19 @@ namespace Minibar
             catch { }
             string dl = Path.Combine(Downloads, d.Name);
             if (Directory.Exists(dl)) Walk(dl, 2);
+            // a download saved loose (Discord: Downloads\Pulp (2).exe), and loose beside Minibar itself
+            void Loose(string dir)
+            {
+                try
+                {
+                    if (!Directory.Exists(dir)) return;
+                    foreach (var f in Directory.GetFiles(dir, d.Name + "*.exe"))
+                        if (IsAppExe(f, d)) found.Add(f);
+                }
+                catch { }
+            }
+            Loose(Downloads);
+            try { Loose(AppsHome(System.Windows.Forms.Application.ExecutablePath)); } catch { }
             // where Minibar's Install puts apps: next to Minibar's folder, or %LOCALAPPDATA%\Programs\<App>
             try
             {
@@ -238,15 +316,16 @@ namespace Minibar
             {
                 try
                 {
-                    if (string.IsNullOrEmpty(f) || !File.Exists(f) || Path.GetFileName(f).IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) return;
-                    if (!Path.GetFileName(f).Equals(d.Name + ".exe", StringComparison.OrdinalIgnoreCase)) return;
-                    if (!found.Any(x => SameFile(x, f))) found.Add(f);
+                    if (string.IsNullOrEmpty(f) || !IsAppExe(f, d)) return;
+                    found.Add(f);
                 }
                 catch { }
             }
             if (s != null && s.Seen.TryGetValue(d.Name, out var seen)) Add(seen);
             Add(StartMenu.TargetOf(d.Name));
-            return found;
+            var distinct = new List<string>();
+            foreach (var f in found) if (!distinct.Any(x => SameFile(x, f))) distinct.Add(f);
+            return distinct;
         }
 
         public static void Locate(AppInfo a, Settings s, string runningPath)
@@ -258,7 +337,7 @@ namespace Minibar
             {
                 string run = ExeFromCommand(RunValue(a.Def.RunName));
                 if (run == null && s.RunCmd.TryGetValue(a.Def.Name, out var kept)) run = ExeFromCommand(kept);
-                if (run != null && File.Exists(run) && Path.GetFileName(run).Equals(a.Def.Name + ".exe", StringComparison.OrdinalIgnoreCase)) { exe = run; src = "startup"; }
+                if (run != null && IsAppExe(run, a.Def)) { exe = run; src = "startup"; }
                 else
                 {
                     exe = Candidates(a.Def, s).OrderByDescending(FileVer).ThenByDescending(f => { try { return File.GetLastWriteTimeUtc(f); } catch { return DateTime.MinValue; } }).FirstOrDefault();
@@ -299,12 +378,14 @@ namespace Minibar
             {
                 try
                 {
-                    if (byName.TryGetValue(p.ProcessName, out var l))
+                    var a = apps.FirstOrDefault(x => IsAppProcess(p, x));
+                    if (a != null)
                     {
+                        var l = byName[a.Def.Name];
                         long mem = 0;
                         try { mem = p.WorkingSet64; } catch { }
                         l.Add(Tuple.Create(p.Id, mem));
-                        try { var st = p.StartTime; if (!started.TryGetValue(p.ProcessName, out var cur) || st < cur) started[p.ProcessName] = st; } catch { }   // admin processes: unknown
+                        try { var st = p.StartTime; if (!started.TryGetValue(a.Def.Name, out var cur) || st < cur) started[a.Def.Name] = st; } catch { }   // admin processes: unknown
                     }
                 }
                 catch { }
@@ -357,11 +438,52 @@ namespace Minibar
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { throw new OperationCanceledException("Cancelled at the admin prompt."); }
         }
 
-        // the processes of this app right now (by name; any copy)
-        public static List<int> PidsNow(AppDef d)
+        // a process of this app: called <App>, or a renamed copy ("Pulp (2)", or the exe he picked) that really is the app
+        static bool IsAppProcess(Process p, AppInfo a)
+        {
+            string n = p.ProcessName;
+            if (n.Equals(a.Def.Name, StringComparison.OrdinalIgnoreCase)) return true;
+            bool picked = a.Exe != null && n.Equals(Path.GetFileNameWithoutExtension(a.Exe), StringComparison.OrdinalIgnoreCase);
+            if (!picked && !n.StartsWith(a.Def.Name, StringComparison.OrdinalIgnoreCase)) return false;
+            string path = Native.ProcessPath(p.Id);
+            return path != null && (SameFile(path, a.Exe) || IsAppExe(path, a.Def));
+        }
+
+        // Start from the card for an app that shows nothing when it starts: start it and show its window
+        // (Pulp: without --tray it opens its panel; Fizz: started, then asked to open its settings once it's up)
+        public static void StartAndOpen(AppInfo a)
+        {
+            if (!a.Def.Openable) { Start(a); return; }
+            if (a.Def.TaskName == null) { Start(a, ""); return; }
+            Start(a);
+            // Fizz may sit at an admin prompt first; once it runs, give it a moment to set up, then ask it to open
+            for (int i = 0; i < 300 && PidsNow(a).Count == 0; i++) System.Threading.Thread.Sleep(100);
+            if (PidsNow(a).Count == 0) return;
+            System.Threading.Thread.Sleep(3000);
+            Open(a);
+        }
+
+        // brings a running app's window up: a second "<App>.exe" (no args) tells the running one to show itself
+        // (Pulp: its panel; Fizz: its settings, without an admin prompt)
+        public static void Open(AppInfo a)
+        {
+            string exe = a.OtherCopy ?? a.Exe;
+            if (exe == null || !File.Exists(exe)) throw new InvalidOperationException("Minibar can't find " + a.Def.Name + ".exe.");
+            Process.Start(new ProcessStartInfo(exe, "") { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe) })?.Dispose();
+        }
+
+        // the processes of this app right now (any copy, renamed ones too)
+        public static List<int> PidsNow(AppInfo a)
         {
             var list = new List<int>();
-            try { foreach (var p in Process.GetProcessesByName(d.Name)) { list.Add(p.Id); p.Dispose(); } } catch { }
+            Process[] all = new Process[0];
+            try { all = Process.GetProcesses(); } catch { }
+            foreach (var p in all)
+            {
+                try { if (IsAppProcess(p, a)) list.Add(p.Id); }
+                catch { }
+                finally { p.Dispose(); }
+            }
             return list;
         }
 
@@ -382,27 +504,43 @@ namespace Minibar
         // force-closes the app and anything it started (Pour's yt-dlp, Fizz's PresentMon), then clears its tray icon
         public static void Stop(AppInfo a)
         {
-            var pids = a.Pids.ToList();
+            // the processes right now: the last scan can be 1.5 s old
+            var pids = PidsNow(a);
             if (pids.Count == 0) return;
+            a.Pids = pids;
             // newer apps close themselves cleanly when asked (tray icon removed, everything saved)
             if (a.Def.ExitSince != null && a.Exe != null && FileVer(a.Exe) >= a.Def.ExitSince)
             {
                 try
                 {
-                    using (var p = Process.Start(new ProcessStartInfo(a.Exe, "--exit") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(a.Exe) }))
-                        p?.WaitForExit(3000);
+                    try
+                    {
+                        using (var p = Process.Start(new ProcessStartInfo(a.Exe, "--exit") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(a.Exe) }))
+                            p?.WaitForExit(3000);
+                    }
+                    catch (Win32Exception ex) when (ex.NativeErrorCode == 740)
+                    {
+                        // only for an exe whose manifest demands admin. Fizz 1.1+ is asInvoker and its hub accepts
+                        // --exit from a non-admin process, so it never gets here: no prompt for a clean close.
+                        RunElevated(a.Exe, "--exit", Path.GetDirectoryName(a.Exe));
+                    }
                     for (int i = 0; i < 40 && StillRunning(pids); i++) System.Threading.Thread.Sleep(100);
                     if (!StillRunning(pids)) return;
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex) { Log.Crash(ex); }
             }
             var wins = Native.WindowsOf(new HashSet<int>(pids));
             string args = "/F /T " + string.Join(" ", pids.Select(p => "/PID " + p));
             int rc = Run("taskkill.exe", args, out string output);
-            // an app running as admin (Fizz) can only be closed from an admin prompt
-            if (rc != 0 && StillRunning(pids))
-                RunElevated("taskkill.exe", "/F /T /IM \"" + a.Def.Name + ".exe\"");
-            for (int i = 0; i < 30 && StillRunning(pids); i++) System.Threading.Thread.Sleep(100);
+            if (!(a.Def.NeedsAdmin && rc != 0))
+                for (int i = 0; i < 30 && StillRunning(pids); i++) System.Threading.Thread.Sleep(100);
+            // only a process Minibar isn't allowed to close (running as admin) gets the admin prompt
+            if (StillRunning(pids) && (a.Def.NeedsAdmin || pids.Any(p => !Native.CanTerminate(p))))
+            {
+                RunElevated("taskkill.exe", args);
+                for (int i = 0; i < 30 && StillRunning(pids); i++) System.Threading.Thread.Sleep(100);
+            }
             Native.RemoveTrayIcons(wins);
             if (StillRunning(pids)) throw new Exception(a.Def.Name + " didn't close.");
         }
@@ -424,12 +562,19 @@ namespace Minibar
             try
             {
                 var psi = new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-                using (var p = Process.Start(psi))
+                var sb = new System.Text.StringBuilder();
+                using (var outDone = new System.Threading.ManualResetEvent(false))
+                using (var errDone = new System.Threading.ManualResetEvent(false))
+                using (var p = new Process { StartInfo = psi })
                 {
-                    var err = p.StandardError.ReadToEndAsync();
-                    output = p.StandardOutput.ReadToEnd();
-                    if (!p.WaitForExit(15000)) { try { p.Kill(); } catch { } return -1; }
-                    output += err.Result;
+                    // read both pipes as they come, so the timeout below always applies (a blocking read can hang forever)
+                    p.OutputDataReceived += (o, e) => { if (e.Data == null) { try { outDone.Set(); } catch { } } else lock (sb) sb.AppendLine(e.Data); };
+                    p.ErrorDataReceived += (o, e) => { if (e.Data == null) { try { errDone.Set(); } catch { } } else lock (sb) sb.AppendLine(e.Data); };
+                    p.Start();
+                    p.BeginOutputReadLine(); p.BeginErrorReadLine();
+                    if (!p.WaitForExit(15000)) { try { p.Kill(); } catch { } lock (sb) output = sb.ToString(); return -1; }
+                    outDone.WaitOne(2000); errDone.WaitOne(2000);
+                    lock (sb) output = sb.ToString();
                     return p.ExitCode;
                 }
             }
@@ -437,11 +582,13 @@ namespace Minibar
         }
 
         // one UAC prompt; throws OperationCanceledException if he says no
-        static int RunElevated(string exe, string args)
+        static int RunElevated(string exe, string args, string dir = null)
         {
             try
             {
-                using (var p = Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true }))
+                var psi = new ProcessStartInfo(exe, args) { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true };
+                if (dir != null) psi.WorkingDirectory = dir;
+                using (var p = Process.Start(psi))
                 {
                     if (p == null) return -1;
                     p.WaitForExit(20000);
@@ -478,25 +625,29 @@ namespace Minibar
             return rc;
         }
 
-        public static void SetStartup(AppInfo a, Settings s, bool on)
+        // What to remember in settings.ini afterwards (run.<App>=), applied by the caller on the UI thread:
+        // null = leave it as it is; Item1 true = the command to keep (Item2) / Item1 false = forget it.
+        // Runs off the UI thread, so it never touches Settings itself.
+        public static Tuple<bool, string> SetStartup(AppInfo a, string kept, bool on)
         {
             if (a.Def.TaskName != null)
             {
                 if (TaskQuery(a.Def.TaskName, out _) != 0) throw new Exception("Open Fizz once and turn on \"Start with Windows\" there first.");
                 RunElevated("schtasks.exe", "/Change /TN \"" + a.Def.TaskName + "\" " + (on ? "/ENABLE" : "/DISABLE"));
-                return;
+                return null;
             }
+            Tuple<bool, string> remember = null;
             using (var k = Registry.CurrentUser.CreateSubKey(RunKey))
             {
                 if (on)
                 {
                     if (a.Exe == null) throw new Exception("Minibar can't find " + a.Def.Name + ".exe.");
                     // restore the app's own command if it was for this exe, otherwise write it the way the app does
-                    string cmd = s.RunCmd.TryGetValue(a.Def.Name, out var kept) && SameFile(ExeFromCommand(kept), a.Exe) ? kept
+                    string cmd = kept != null && SameFile(ExeFromCommand(kept), a.Exe) ? kept
                         : ("\"" + a.Exe + "\" " + a.Def.RunArgs).Trim();
                     string cur = k.GetValue(a.Def.RunName) as string;
                     if (cur == null || !SameFile(ExeFromCommand(cur), a.Exe)) k.SetValue(a.Def.RunName, cmd);
-                    s.RunCmd.Remove(a.Def.Name);
+                    remember = Tuple.Create(false, (string)null);
                     try
                     {
                         using (var ap = Registry.CurrentUser.OpenSubKey(ApprovedKey, true))
@@ -506,11 +657,11 @@ namespace Minibar
                 }
                 else
                 {
-                    if (k.GetValue(a.Def.RunName) is string cur) s.RunCmd[a.Def.Name] = cur;
+                    if (k.GetValue(a.Def.RunName) is string cur) remember = Tuple.Create(true, cur);
                     k.DeleteValue(a.Def.RunName, false);
                 }
             }
-            s.Save();
+            return remember;
         }
 
         // ------------------------------------------------------------ Fizz: what it needs before it works

@@ -122,9 +122,39 @@ namespace MinibarSetup
             return list;
         }
 
-        // asks each Minibar to close like its X button does (an update it's installing still finishes first);
-        // returns the ones still open after the wait
-        public static List<Running> Close(List<Running> running, int waitMs)
+        // the same name Minibar holds while it installs / updates / rolls back an app (Minibar.UpdateLock)
+        public const string UpdateLockName = "Minibar.Updating.v1";
+
+        // true when no Minibar is in the middle of an update (anymore); waits up to ms for it to finish
+        public static bool WaitForUpdates(int ms)
+        {
+            Mutex m;
+            try { m = Mutex.OpenExisting(UpdateLockName); }
+            catch { return true; }   // nobody holds it: nothing running
+            using (m)
+            {
+                try
+                {
+                    if (!m.WaitOne(ms)) return false;
+                    m.ReleaseMutex();
+                    return true;
+                }
+                catch (AbandonedMutexException) { try { m.ReleaseMutex(); } catch { } return true; }
+                catch { return true; }
+            }
+        }
+
+        public static bool UpdateRunning()
+        {
+            try { using (var m = Mutex.OpenExisting(UpdateLockName)) { } }
+            catch { return false; }
+            return !WaitForUpdates(0);
+        }
+
+        // asks each Minibar to close like its X button does. Minibar finishes an update it's installing first,
+        // so while one is running this waits for it (up to updateWaitMs) instead of giving up after waitMs.
+        // Returns the ones still open after the wait.
+        public static List<Running> Close(List<Running> running, int waitMs, int updateWaitMs = 180000, Action<string> progress = null)
         {
             foreach (var r in running)
                 foreach (var h in Win.WindowsOf(r.Pid))
@@ -142,6 +172,16 @@ namespace MinibarSetup
                     }
                 }
                 catch { }   // already gone
+            }
+            if (left.Count > 0 && UpdateRunning())
+            {
+                progress?.Invoke("Minibar is finishing an update…");
+                WaitForUpdates(updateWaitMs);
+                var still = new List<Running>();
+                foreach (var r in left)
+                    try { using (var p = Process.GetProcessById(r.Pid)) if (!p.WaitForExit(10000)) still.Add(r); }
+                    catch { }
+                left = still;
             }
             return left;
         }

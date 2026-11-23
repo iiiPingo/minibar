@@ -50,11 +50,9 @@ namespace Minibar
         bool ShowFizzNotice(AppInfo a) => a.Def.Name == "Fizz" && a.Found && !a.Running;
 
         string NoticeTitle(AppInfo a) => a.PawnIO == false ? "Install PawnIO before you start Fizz" : "Before you start Fizz";
-        string NoticeText(AppInfo a) =>
-            (a.PawnIO == false ? "Fizz needs this driver to read temperatures and clocks. Installing it takes one admin prompt.\n" : "")
-            + "Fizz asks for admin when it starts. The overlay doesn't touch your games, but FACEIT's anti-cheat may block the PawnIO driver, so close Fizz before FACEIT matches. "
-            + "(FACEIT is a separate matchmaking service, mostly for CS2, with its own strict anti-cheat. Normal Steam matches are fine.)\n"
-            + "Both helpers already come in Fizz's tools folder; the official downloads are below if you ever need them.";
+        string NoticeText(AppInfo a) => a.PawnIO == false
+            ? "Needed for temperatures. FACEIT may block it, so close Fizz before FACEIT matches."
+            : "FACEIT may block Fizz's PawnIO driver, so close Fizz before FACEIT matches.";
 
         int NoticeTextW(int width) => width - S(16 + 32 + 18);
 
@@ -191,7 +189,7 @@ namespace Minibar
             else
             {
                 // what the app is, then what it's best at (the exe's place is one click away under Folder)
-                string more = !a.Found ? "Not on this PC yet. Install gets it from GitHub; already have it? Use Locate."
+                string more = !a.Found ? "Not on this PC yet. Install gets it, or Locate finds your copy."
                     : a.OtherCopy != null ? "Running from another copy: " + a.OtherCopy
                     : a.Def.Highlights ?? "";
                 int bw = TextW(g, a.Def.Blurb, fSmall);
@@ -229,7 +227,13 @@ namespace Minibar
             else
             {
                 if (a.Busy != null) bx += Button(g, a, "busy", null, a.Busy, bx, by, false, disabled: true) + S(18);
-                else if (a.Running) bx += Button(g, a, "stop", Theme.GStop, "Stop", bx, by, false) + S(18);
+                else if (a.Running)
+                {
+                    bx += Button(g, a, "stop", Theme.GStop, "Stop", bx, by, false) + S(8);
+                    // tray apps that don't show anything when started (Fizz, Pulp): bring their window up
+                    if (a.Def.Openable) bx += Button(g, a, "open", "\uE8A7", "Open", bx, by, false) + S(8);
+                    bx += S(10);
+                }
                 else bx += Button(g, a, "start", Theme.GPlay, "Start", bx, by, true) + S(18);
 
                 // start with Windows (Windows 11 style switch)
@@ -307,8 +311,11 @@ namespace Minibar
                 int bx2 = tx, by2 = nr.Bottom - S(44);
                 if (a.PawnIO == false && a.PawnSetup != null)
                     bx2 += Button(g, a, "pawn", null, "Install PawnIO", bx2, by2, true, h: S(30)) + S(8);
-                bx2 += LinkChip(g, a, "link:pawnio", "PawnIO  \u00b7  pawnio.eu", bx2, by2) + S(6);
-                LinkChip(g, a, "link:presentmon", "PresentMon  \u00b7  GitHub", bx2, by2);
+                // short labels when the window is too narrow for the full ones
+                string la = "PawnIO  \u00b7  pawnio.eu", lb = "PresentMon  \u00b7  GitHub";
+                if (bx2 + LinkChipW(g, la) + S(6) + LinkChipW(g, lb) > nr.Right - S(12)) { la = "PawnIO"; lb = "PresentMon"; }
+                bx2 += LinkChip(g, a, "link:pawnio", la, bx2, by2) + S(6);
+                LinkChip(g, a, "link:presentmon", lb, bx2, by2);
             }
         }
 
@@ -336,9 +343,11 @@ namespace Minibar
         }
 
         // a filled chip that opens a web page (\uE8A7 = open in new window)
+        int LinkChipW(Graphics g, string text) => TextW(g, text, fChip) + S(40);
+
         int LinkChip(Graphics g, AppInfo a, string id, string text, int x, int y)
         {
-            int w = TextW(g, text, fChip) + S(40);
+            int w = LinkChipW(g, text);
             var r = new Rectangle(x, y, w, S(30));
             bool hv = Hov(a, id);
             Theme.Fill(g, r, hv ? Color.FromArgb(70, 70, 70) : Color.FromArgb(54, 54, 54), S(7));

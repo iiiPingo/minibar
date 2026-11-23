@@ -223,7 +223,7 @@ namespace MinibarSetup
                     if (running.Count > 0)
                     {
                         Step(0.15f, "Closing Minibar…");
-                        var left = Inst.Close(running, 20000);
+                        var left = Inst.Close(running, 20000, 180000, m => Step(0.2f, m));
                         if (left.Count > 0)
                         {
                             if (!kill) { stuck = true; return; }

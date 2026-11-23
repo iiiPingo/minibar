@@ -6,6 +6,8 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using Timer = System.Windows.Forms.Timer;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -33,6 +35,9 @@ namespace Minibar
         Label appsSub;
         FlatBtn forget;
         Label backupNote;
+        Font fLogoText;
+        int workers;               // installs / updates / rollbacks running right now
+        bool closeWhenDone;        // closed while one was running: hidden until it's finished, then closes
 
         int S(float v) => (int)Math.Round(v * s);
         int NavW => S(176);
@@ -61,6 +66,7 @@ namespace Minibar
             fH2 = Theme.UiSemi(10.5f);
             fNav = Theme.Ui(10.5f);
             fNavIcon = new Font(Theme.IconFont, 11f);
+            fLogoText = Theme.UiTitle(13f);
 
             self.Exe = Application.ExecutablePath;
             self.Version = Apps.VersionText(self.Exe) ?? Application.ProductVersion;
@@ -77,7 +83,8 @@ namespace Minibar
             foreach (var a in AllRows) if (st.Releases.TryGetValue(a.Def.Name, out var packed)) a.Rel = Release.Unpack(packed);
             RefreshBackups();
             timer = new Timer { Interval = 1500 };
-            timer.Tick += (o, e) => { if (WindowState != FormWindowState.Minimized) Rescan(); };
+            // minimized (or hidden to the tray): no full rescan, but a queued update still goes in once Pour is done
+            timer.Tick += (o, e) => { if (WindowState != FormWindowState.Minimized) Rescan(); else RunQueue(true); };
             timer.Start();
         }
 
@@ -99,6 +106,7 @@ namespace Minibar
             if (m.Msg == Native.WM_SHOWMINIBAR && Native.WM_SHOWMINIBAR != 0)
             {
                 // Minibar was opened again: bring this window up instead
+                closeWhenDone = false;
                 if (!Visible) RestoreFromTray();
                 if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
                 Show();
@@ -152,6 +160,17 @@ namespace Minibar
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
+            if (e.Cancel) return;
+            // an update is still going: finish it first (hidden), then close. Opening Minibar again brings it back.
+            // (Windows shutting down or Task Manager don't wait.)
+            if (Volatile.Read(ref workers) > 0 && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                closeWhenDone = true;
+                if (tray != null) tray.Visible = false;
+                Hide();
+                return;
+            }
             timer?.Stop();
             if (tray != null) { tray.Visible = false; tray.Dispose(); tray = null; }
             var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
@@ -262,12 +281,12 @@ namespace Minibar
             trayT.Changed += () => { st.MinimizeToTray = trayT.On; st.Save(); };
             p.Controls.Add(trayT);
             y += S(56);
-            var updT = new Toggle("Check for updates when Minibar opens", s) { Location = new Point(0, y), Width = w, Hint = "Asks GitHub at most once an hour. Nothing installs unless you click Update or turn on Auto.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            var updT = new Toggle("Check for updates when Minibar opens", s) { Location = new Point(0, y), Width = w, Hint = "At most once an hour. Nothing installs unless you click Update or use Auto.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             updT.On = st.CheckUpdates;
             updT.Changed += () => { st.CheckUpdates = updT.On; st.Save(); };
             p.Controls.Add(updT);
             y += S(56);
-            var smT = new Toggle("Show the apps in Windows search", s) { Location = new Point(0, y), Width = w, Hint = "Start menu shortcuts for each app, so typing \"Pulp\" in search opens it. Off removes them.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            var smT = new Toggle("Show the apps in Windows search", s) { Location = new Point(0, y), Width = w, Hint = "Start menu shortcuts, so typing \"Pulp\" in search opens it. Off removes them.", Height = S(50), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             smT.On = st.StartMenu;
             smT.Changed += () => { st.StartMenu = smT.On; st.Save(); StartMenu.Reset(); SyncStartMenu(); };
             p.Controls.Add(smT);
@@ -275,8 +294,8 @@ namespace Minibar
 
             Lbl(p, "Finding your apps", 0, y, w, S(24), Theme.Text, fH2);
             Lbl(p, "Minibar uses, in order: a file you picked with Locate, the running app, its start-with-Windows entry, " +
-                   "then the newest copy in your Claude Projects folder or Downloads. Backups are skipped.", 0, y + S(26), w, S(40), Theme.Dim, fSmall);
-            y += S(74);
+                   "then the newest copy in your Claude Projects folder or Downloads. Backups are skipped.", 0, y + S(26), w, S(58), Theme.Dim, fSmall);
+            y += S(92);
             var again = new FlatBtn("Look again", s) { Location = new Point(0, y), Width = S(130) };
             again.Click += (o, e) => LookAgain();
             p.Controls.Add(again);
@@ -288,8 +307,8 @@ namespace Minibar
 
             Lbl(p, "Back up settings", 0, y, w, S(24), Theme.Text, fH2);
             Lbl(p, "One zip with the settings of every app and Minibar (link rules, device names, volumes, hotkeys...). " +
-                   "Pulp's clipboard history isn't included. Restore puts them back and restarts the apps that were open.", 0, y + S(26), w, S(40), Theme.Dim, fSmall);
-            y += S(74);
+                   "Pulp's clipboard history isn't included. Restore puts them back and restarts the apps that were open.", 0, y + S(26), w, S(58), Theme.Dim, fSmall);
+            y += S(92);
             var bk = new FlatBtn("Back up…", s) { Location = new Point(0, y), Width = S(130) };
             bk.Click += (o, e) => BackupSettings();
             p.Controls.Add(bk);
@@ -301,8 +320,8 @@ namespace Minibar
             y += S(62);
 
             Lbl(p, "Minibar's own files", 0, y, w, S(24), Theme.Text, fH2);
-            Lbl(p, "settings.ini and crash.log in %APPDATA%\\Minibar; old app versions in %LOCALAPPDATA%\\Minibar\\backup. Closing Minibar quits it, so nothing runs in the background.", 0, y + S(26), w, S(40), Theme.Dim, fSmall);
-            y += S(74);
+            Lbl(p, "settings.ini and crash.log in %APPDATA%\\Minibar; old app versions in %LOCALAPPDATA%\\Minibar\\backup. Closing Minibar quits it, so nothing runs in the background.", 0, y + S(26), w, S(58), Theme.Dim, fSmall);
+            y += S(92);
             var folder = new FlatBtn("Open data folder", s) { Location = new Point(0, y), Width = S(150) };
             folder.Click += (o, e) => { try { Directory.CreateDirectory(Settings.Dir); Process.Start("explorer.exe", "\"" + Settings.Dir + "\"")?.Dispose(); } catch { } };
             p.Controls.Add(folder);
@@ -339,7 +358,11 @@ namespace Minibar
 
         void RefreshBackups()
         {
-            foreach (var a in AllRows) a.Backup = a.Def.Self ? null : Updater.LatestBackup(a);
+            foreach (var a in AllRows)
+            {
+                a.Backup = a.Def.Self ? null : Updater.LatestBackup(a);
+                a.BackupLabel = a.Backup == null ? null : Updater.BackupLabel(a.Backup);
+            }
         }
 
         void CheckForUpdates(bool manual)
@@ -372,21 +395,69 @@ namespace Minibar
                         if (r.Problem == null || r.Problem == "missing") anyOk = true;
                     }
                     if (anyOk) st.LastCheck = DateTime.UtcNow;
+                    // a newer release than the one he went back from: Auto may install again
+                    foreach (var a in AllRows)
+                        if (st.Skip.TryGetValue(a.Def.Name, out var sk) && a.Rel?.Tag != null && a.Rel.Problem == null && !string.Equals(a.Rel.Tag, sk, StringComparison.OrdinalIgnoreCase))
+                            st.Skip.Remove(a.Def.Name);
                     st.Save();
                     UpdateCheckedText();
                     list.Invalidate();
                     ulist.Invalidate();
                     // Auto: install by itself, one app after another (Minibar itself last, since it restarts)
-                    foreach (var a in apps.Where(x => st.AutoUpdate.Contains(x.Def.Name) && Updater.CanUpdate(x))) StartInstall(a);
-                    if (st.AutoUpdate.Contains(self.Def.Name) && Updater.CanUpdate(self) && !apps.Any(x => x.Updating)) StartSelfUpdate();
+                    foreach (var a in apps.Where(AutoMay).ToList()) StartInstall(a);
+                    if (AutoMay(self) && !apps.Any(x => x.Updating) && Volatile.Read(ref workers) == 0) StartSelfUpdate();
                 });
             });
+        }
+
+        // Auto installs this app's update now: switched on, an update is there, and it's not the release he went back from
+        bool AutoMay(AppInfo a) =>
+            st.AutoUpdate.Contains(a.Def.Name) && Updater.CanUpdate(a)
+            && !(st.Skip.TryGetValue(a.Def.Name, out var sk) && string.Equals(sk, a.Rel?.Tag, StringComparison.OrdinalIgnoreCase));
+
+        // runs an install / update / rollback on a foreground thread (closing Minibar waits for it, see OnFormClosing),
+        // holding UpdateLock so the setup can tell. done(err) runs on the UI thread.
+        void RunWorker(string name, Action work, Action<Exception> done)
+        {
+            Interlocked.Increment(ref workers);
+            var th = new Thread(() =>
+            {
+                Exception err = null;
+                Mutex m = null;
+                try
+                {
+                    try { m = new Mutex(false, UpdateLock.Name); try { m.WaitOne(); } catch (AbandonedMutexException) { } }
+                    catch { m = null; }
+                    work();
+                }
+                catch (Exception ex) { err = ex; }
+                finally
+                {
+                    try { m?.ReleaseMutex(); } catch { }
+                    try { m?.Dispose(); } catch { }
+                    Interlocked.Decrement(ref workers);
+                }
+                Ui(() =>
+                {
+                    try { done(err); }
+                    finally { if (closeWhenDone && Volatile.Read(ref workers) == 0) Close(); }
+                });
+            }) { IsBackground = false, Name = name };
+            th.Start();
+        }
+
+        // while Minibar replaces itself nothing else starts (it closes as soon as it's done)
+        bool SelfBusy(AppInfo a)
+        {
+            if (!self.Updating) return false;
+            Fail(a, new InvalidOperationException("Minibar is updating itself. Try again in a moment."));
+            return true;
         }
 
         // an app that isn't on this PC: download it from GitHub, put it next to Minibar, start it (Fizz waits for its notice)
         void InstallNew(AppInfo a)
         {
-            if (a.Found || a.Busy != null || a.Updating) return;
+            if (a.Found || a.Busy != null || a.Updating || SelfBusy(a)) return;
             a.Updating = true;
             a.Busy = "Waiting…";
             a.Error = null;
@@ -394,13 +465,10 @@ namespace Minibar
             string self = null;
             try { self = Application.ExecutablePath; } catch { }
             var rel = a.Rel;
-            var th = new System.Threading.Thread(() =>
-            {
-                Exception err = null;
-                string exe = null;
-                try { exe = Updater.InstallNew(a.Def, rel, self, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })); }
-                catch (Exception ex) { err = ex; Log.Crash(ex); }
-                Ui(() =>
+            string exe = null;
+            RunWorker("Minibar install " + a.Def.Name,
+                () => exe = Updater.InstallNew(a.Def, rel, self, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })),
+                err =>
                 {
                     a.Busy = null;
                     a.Updating = false;
@@ -420,14 +488,12 @@ namespace Minibar
                     UpdateForget();
                     ulist.Invalidate();
                 });
-            }) { IsBackground = false, Name = "Minibar install " + a.Def.Name };
-            th.Start();
         }
 
         // installs run on a foreground thread: closing Minibar mid-update still lets it finish (or undo) cleanly
         void StartInstall(AppInfo a)
         {
-            if (a.Updating || a.Busy != null || !Updater.CanUpdate(a)) return;
+            if (a.Updating || a.Busy != null || !Updater.CanUpdate(a) || SelfBusy(a)) return;
             // a running app is closed (cleanly first), updated and opened again the way it was running (Updater.Apply).
             // Only Pour in the middle of a download waits: the update goes in by itself once the download is done.
             if (Apps.BusyWithWork(a))
@@ -442,77 +508,79 @@ namespace Minibar
             a.Error = null;
             list.Invalidate(); ulist.Invalidate();
             string target = a.Rel.Label;
-            var th = new System.Threading.Thread(() =>
-            {
-                Exception err = null;
-                try { Updater.Install(a, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })); }
-                catch (Exception ex) { err = ex; Log.Crash(ex); }
-                Ui(() =>
+            RunWorker("Minibar update " + a.Def.Name,
+                () => Updater.Install(a, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })),
+                err =>
                 {
                     a.Busy = null;
                     a.Updating = false;
                     a.Version = a.Exe != null ? Apps.VersionText(a.Exe) : null;
                     a.Icon?.Dispose(); a.Icon = null;   // the new exe may have a new icon
                     if (err != null) Fail(a, err);
-                    else { a.Note = a.Def.Name + " updated to v" + target + ". Your settings were kept."; a.NoteUntil = DateTime.Now.AddSeconds(10); RepaintLater(10200); }
+                    else
+                    {
+                        if (st.Skip.Remove(a.Def.Name)) st.Save();   // he updated on purpose: Auto may follow again
+                        a.Note = a.Def.Name + " updated to v" + target + ". Your settings were kept."; a.NoteUntil = DateTime.Now.AddSeconds(10); RepaintLater(10200);
+                    }
                     RefreshBackups();
                     Rescan();
                     ulist.Invalidate();
                     UpdateCheckedText();
                 });
-            }) { IsBackground = false, Name = "Minibar update " + a.Def.Name };
-            th.Start();
         }
 
         void StartSelfUpdate()
         {
             if (self.Updating || !Updater.CanUpdate(self)) return;
+            // it closes Minibar when it's done, so it waits for nothing else to be running
+            if (Volatile.Read(ref workers) > 0 || apps.Any(x => x.Updating))
+            {
+                Fail(self, new InvalidOperationException("Wait for the other update to finish, then update Minibar."));
+                ulist.Invalidate();
+                return;
+            }
             self.Updating = true;
             self.Busy = "Downloading…";
             ulist.Invalidate();
-            var th = new System.Threading.Thread(() =>
-            {
-                Exception err = null;
-                try { Updater.SelfUpdate(self, msg => Ui(() => { self.Busy = msg; ulist.Invalidate(); })); }
-                catch (Exception ex) { err = ex; Log.Crash(ex); }
-                Ui(() =>
+            RunWorker("Minibar self-update",
+                () => Updater.SelfUpdate(self, msg => Ui(() => { self.Busy = msg; ulist.Invalidate(); })),
+                err =>
                 {
                     self.Updating = false;
                     self.Busy = null;
                     if (err != null) { Fail(self, err); ulist.Invalidate(); return; }
+                    closeWhenDone = false;
                     Close();   // the new Minibar is already starting and waits for this one to exit
                 });
-            }) { IsBackground = false, Name = "Minibar self-update" };
-            th.Start();
         }
 
         void RollBack(AppInfo a)
         {
-            if (a.Busy != null || a.Backup == null) return;
-            string label = Updater.BackupLabel(a.Backup) ?? "the previous version";
+            if (a.Busy != null || a.Backup == null || SelfBusy(a)) return;
+            string label = a.BackupLabel ?? "the previous version";
             a.Busy = "Restoring…";
             a.Updating = true;
             list.Invalidate(); ulist.Invalidate();
-            var th = new System.Threading.Thread(() =>
-            {
-                Exception err = null;
-                try { Updater.Rollback(a, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })); }
-                catch (Exception ex) { err = ex; Log.Crash(ex); }
-                Ui(() =>
+            RunWorker("Minibar rollback " + a.Def.Name,
+                () => Updater.Rollback(a, msg => Ui(() => { a.Busy = msg; list.Invalidate(); ulist.Invalidate(); })),
+                err =>
                 {
                     a.Busy = null;
                     a.Updating = false;
                     a.Version = a.Exe != null ? Apps.VersionText(a.Exe) : null;
                     a.Icon?.Dispose(); a.Icon = null;
                     if (err != null) Fail(a, err);
-                    else { a.Note = a.Def.Name + " is back on " + label + "."; a.NoteUntil = DateTime.Now.AddSeconds(10); RepaintLater(10200); }
+                    else
+                    {
+                        // he went back on purpose: Auto mustn't reinstall the release he left (a newer one is fine)
+                        if (a.Rel?.Tag != null && a.Rel.Problem == null) { st.Skip[a.Def.Name] = a.Rel.Tag; st.Save(); }
+                        a.Note = a.Def.Name + " is back on " + label + "."; a.NoteUntil = DateTime.Now.AddSeconds(10); RepaintLater(10200);
+                    }
                     RefreshBackups();
                     Rescan();
                     ulist.Invalidate();
                     UpdateCheckedText();
                 });
-            }) { IsBackground = false, Name = "Minibar rollback " + a.Def.Name };
-            th.Start();
         }
 
         void RepaintLater(int ms)
@@ -533,7 +601,7 @@ namespace Minibar
                         if (!st.AutoUpdate.Remove(a.Def.Name)) st.AutoUpdate.Add(a.Def.Name);
                         st.Save();
                         ulist.Invalidate();
-                        if (st.AutoUpdate.Contains(a.Def.Name) && Updater.CanUpdate(a)) { if (a.Def.Self) StartSelfUpdate(); else StartInstall(a); }
+                        if (AutoMay(a)) { if (a.Def.Self) StartSelfUpdate(); else StartInstall(a); }
                         break;
                     case "notes": if (a.Rel != null) Process.Start(new ProcessStartInfo(a.Rel.PageUrl) { UseShellExecute = true })?.Dispose(); break;
                     case "rollback": RollBack(a); break;
@@ -588,7 +656,7 @@ namespace Minibar
                 string list = string.Join(", ", c.Apps);
                 using (var dlg = new DarkConfirm("Restore settings?", "From the backup made " + (c.Made ?? "earlier") + ": " + list + ".\n\n" +
                     "Their current settings are replaced (a copy is kept in %LOCALAPPDATA%\\Minibar). Apps that are open close for a moment.", "Restore", s))
-                    if (dlg.ShowDialog(this) != DialogResult.OK) { try { Directory.Delete(c.Dir, true); } catch { } return; }
+                    if (dlg.ShowDialog(this) != DialogResult.OK) { SettingsBackup.Discard(c); return; }
                 backupNote.ForeColor = Theme.Sub;
                 backupNote.Text = "Restoring…";
                 bool self = c.Apps.Contains(self_Name);
@@ -606,7 +674,7 @@ namespace Minibar
                         msg = "Restored: " + string.Join(", ", done);
                     }
                     catch (Exception ex) { Log.Crash(ex); msg = "Couldn't restore: " + ex.Message; ok = false; }
-                    finally { try { Directory.Delete(Path.Combine(Updater.Root, Path.GetFileName(c.Dir.TrimEnd('\\', '/'))), true); } catch { } try { Directory.Delete(c.Dir, true); } catch { } }
+                    finally { SettingsBackup.Discard(c); }
                     Ui(() =>
                     {
                         if (ok && self)
@@ -637,12 +705,10 @@ namespace Minibar
                 Apps.Scan(apps, st);
                 foreach (var a in apps) if (a.Def.RunName != null) Apps.ReadStartup(a, st, false);
                 SyncStartMenu();
-                foreach (var a in apps.Where(x => x.Queued && !x.Updating && !Apps.BusyWithWork(x)).ToList())
-                {
-                    if (Updater.CanUpdate(a)) StartInstall(a); else a.Queued = false;
-                }
+                RunQueue(false);
                 int found = apps.Count(a => a.Found), running = apps.Count(a => a.Running);
-                appsSub.Text = found == 0 ? "None of your apps are on this PC yet. Press Install on a card to get one from GitHub."
+                appsSub.Text = InZip ? "Minibar is running from inside the zip. Extract it to a folder first (or use Minibar-Setup) so it can update itself."
+                    : found == 0 ? "None of your apps are on this PC yet. Press Install on a card to get one from GitHub."
                     : running + " of " + found + " running"
                       + (found < apps.Count ? "  ·  " + (apps.Count - found) + " not installed" : "");
                 list.Invalidate();
@@ -651,8 +717,26 @@ namespace Minibar
             catch (Exception ex) { Log.Crash(ex); }
         }
 
+        // queued updates (Pour downloading): go in once it's idle. refresh = the processes weren't just scanned (minimized)
+        void RunQueue(bool refresh)
+        {
+            try
+            {
+                foreach (var a in apps.Where(x => x.Queued && !x.Updating).ToList())
+                {
+                    if (refresh) { a.Pids = Apps.PidsNow(a); a.Running = a.Pids.Count > 0; }
+                    if (Apps.BusyWithWork(a)) continue;
+                    if (Updater.CanUpdate(a)) StartInstall(a); else a.Queued = false;
+                }
+            }
+            catch (Exception ex) { Log.Crash(ex); }
+        }
+
+        static readonly bool InZip = Apps.InTemp(Application.ExecutablePath);
+
         void LookAgain()
         {
+            StartMenu.Reset();
             foreach (var a in apps) Apps.Locate(a, st, null);
             Rescan();
             QueryTasks();
@@ -717,7 +801,10 @@ namespace Minibar
                 switch (id)
                 {
                     case "start":
-                        Background(a, "Starting…", () => { Apps.Start(a); System.Threading.Thread.Sleep(900); });
+                        Background(a, a.Def.Openable ? "Opening…" : "Starting…", () => { Apps.StartAndOpen(a); System.Threading.Thread.Sleep(900); });
+                        break;
+                    case "open":
+                        Background(a, "Opening…", () => { Apps.Open(a); System.Threading.Thread.Sleep(600); });
                         break;
                     case "stop":
                         Background(a, "Stopping…", () => Apps.Stop(a));
@@ -725,7 +812,17 @@ namespace Minibar
                     case "startup":
                         {
                             bool on = a.Startup != true;
-                            Background(a, on ? "Turning on…" : "Turning off…", () => { Apps.SetStartup(a, st, on); Apps.ReadStartup(a, st, true); });
+                            string kept = st.RunCmd.TryGetValue(a.Def.Name, out var k) ? k : null;
+                            Tuple<bool, string> remember = null;
+                            // the registry work runs in the background; settings.ini only changes here on the UI thread
+                            Background(a, on ? "Turning on…" : "Turning off…",
+                                () => { remember = Apps.SetStartup(a, kept, on); Apps.ReadStartup(a, st, true); },
+                                () =>
+                                {
+                                    if (remember == null) return;
+                                    if (remember.Item1) st.RunCmd[a.Def.Name] = remember.Item2; else st.RunCmd.Remove(a.Def.Name);
+                                    st.Save();
+                                });
                             break;
                         }
                     case "folder": Apps.ShowFile(a.Exe); break;
@@ -751,15 +848,16 @@ namespace Minibar
             using (var dlg = new OpenFileDialog
             {
                 Title = "Where is " + a.Def.Name + ".exe?",
-                Filter = a.Def.Name + "|" + a.Def.Name + ".exe|Programs (*.exe)|*.exe",
+                Filter = a.Def.Name + "|" + a.Def.Name + "*.exe|Programs (*.exe)|*.exe",
                 InitialDirectory = a.Exe != null ? Path.GetDirectoryName(a.Exe) : Directory.Exists(Apps.ProjectsRoot) ? Apps.ProjectsRoot : Apps.Downloads,
                 CheckFileExists = true
             })
             {
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                if (!Path.GetFileName(dlg.FileName).Equals(a.Def.Name + ".exe", StringComparison.OrdinalIgnoreCase))
+                // renamed downloads ("Pulp (2).exe") are fine: what counts is what the exe says it is
+                if (!Apps.IsAppExe(dlg.FileName, a.Def))
                 {
-                    Fail(a, new InvalidOperationException("That's not " + a.Def.Name + ".exe. Pick the file called " + a.Def.Name + ".exe."));
+                    Fail(a, new InvalidOperationException("That isn't " + a.Def.Name + ". Pick " + a.Def.Name + ".exe (it may be called something like \"" + a.Def.Name + " (2).exe\")."));
                     return;
                 }
                 st.Located[a.Def.Name] = dlg.FileName;
@@ -790,7 +888,7 @@ namespace Minibar
             g.Clear(Theme.Bg);
             using (var b = new SolidBrush(Theme.Nav)) g.FillRectangle(b, 0, 0, NavW, ClientSize.Height);
             Theme.DrawLogo(g, new RectangleF(S(18), S(20), S(30), S(30)));
-            TextRenderer.DrawText(g, "Minibar", Theme.UiTitle(13f), new Rectangle(S(56), S(18), S(116), S(34)), Theme.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            TextRenderer.DrawText(g, "Minibar", fLogoText, new Rectangle(S(56), S(18), S(116), S(34)), Theme.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             for (int i = 0; i < pages.Length; i++)
             {
                 var r = NavItem(i);
@@ -830,6 +928,7 @@ namespace Minibar
             string self = null;
             try { self = Application.ExecutablePath; } catch { }
             if (self != null && Path.GetFileName(self).IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) self = null;   // mid self-update
+            if (InZip) self = null;   // a copy inside a zip's temp folder won't be there tomorrow
             StartMenu.Sync(apps, self, st.StartMenu);
         }
 
