@@ -35,3 +35,6 @@ On Linux, `./build.sh` does both and writes the release files (zip, setup, exe) 
 ## Third-party
 
 - **Lexend** (Medium and Bold), the font Minibar uses, built into Minibar.exe and the setup. Copyright 2018 The Lexend Project Authors, licensed under the [SIL Open Font License 1.1](src/fonts/OFL.txt). From [Google Fonts](https://fonts.google.com/specimen/Lexend).
+
+## License
+PolyForm Noncommercial License 1.0.0: free to use, copy and change for non-commercial purposes, not for selling or other commercial use. See `LICENSE`. Lexend keeps its own license (see above).
