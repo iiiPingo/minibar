@@ -3,7 +3,7 @@
 Hub window for the drink apps (Echoa, Fizz, Juice, Pour, Pulp). C# WinForms, .NET Framework 4.8, no packages. It finds each app's exe, shows cards (status, version, uptime, Start/Stop, Start with Windows), checks each app's GitHub releases and updates it with backup and rollback, installs apps that aren't on the PC, backs up and restores every app's settings, and updates itself. Window only; minimize to tray is optional (off by default).
 
 ## Layout
-- `src/` the app: `Apps.cs` finding, start, stop, Run keys. `Updates.cs` GitHub checks, install, rollback, self-update. `MainWindow.cs`, `AppList.cs`, `UpdateList.cs`, `Controls.cs`, `Theme.cs` UI. `Backup.cs` settings backup/restore. `StartMenu.cs` Start menu shortcuts. `Native.cs` Win32. `Settings.cs` settings.ini.
+- `src/` the app: `Apps.cs` finding, start, stop, Run keys. `Updates.cs` GitHub checks, install, rollback, self-update. `MainWindow.cs`, `AppList.cs`, `UpdateList.cs`, `Controls.cs`, `Theme.cs` UI. `Backup.cs` settings backup/restore. `StartMenu.cs` Start menu shortcuts. `Native.cs` Win32. `Settings.cs` settings.ini. `fonts/` Lexend and its `OFL.txt`. `appicons/` the logos shown for apps that aren't installed.
 - `setup/` the installer (`Minibar-Setup-x.y.z.exe`): per-user install to `%LOCALAPPDATA%\Programs\Minibar`, Start menu, clean uninstall in Installed apps. It embeds the built `Minibar.exe`, so build `src` first.
 - `tests/minibar` and `tests/setup`: workspace tests, run with mono. `docs/README.txt` plain-words notes ("NEW IN x.y.z" sections). `logo/` logo generator.
 
@@ -11,9 +11,10 @@ Hub window for the drink apps (Echoa, Fizz, Juice, Pour, Pulp). C# WinForms, .NE
 - `./build.sh` (Linux: dotnet-sdk-8.0 + mono-devel) builds `Minibar.exe`, `Minibar-Setup-<version>.exe` and `Minibar-<version>.zip` into `release/`. On Windows run `dotnet build src -c Release`, then `dotnet build setup -c Release`.
 - Bump `<Version>` in both `src/Minibar.csproj` and `setup/Setup.csproj`, and add a "NEW IN x.y.z" section to `docs/README.txt`.
 - Run both test suites before every release. Tests use hooks: `Updater.DownloadOverride`, `ExtractOverride`, `AfterFirstCopy`, `SelfStartOverride`. The 7 CS0649 warnings for those hook fields are expected.
+- Both suites can also draw offscreen pictures of every page and screen with made-up app states: `xvfb-run mono MinibarTests.exe render <dir>`, and `render <dir>` in `tests/setup`. Use them to look at a UI change.
 
 ## Release rules (must never break)
-- Every release ships three files: `Minibar-Setup-x.y.z.exe`, `Minibar-x.y.z.zip` (`Minibar/Minibar.exe`, `.exe.config`, `README.txt`) and a loose `Minibar.exe`. **The zip is what every Minibar downloads to update itself. Never drop it.** The updater picks a zip with "Minibar" in its name first and never picks the setup exe.
+- Every release ships three files: `Minibar-Setup-x.y.z.exe`, `Minibar-x.y.z.zip` (`Minibar/Minibar.exe`, `.exe.config`, `README.txt`, `Lexend-OFL.txt`) and a loose `Minibar.exe`. **The zip is what every Minibar downloads to update itself. Never drop it.** The updater picks a zip with "Minibar" in its name first and never picks the setup exe.
 - Each other app needs a GitHub release whose zip contains `<App>.exe`, with the exe's version bumped, or Minibar shows an endless or missing Update button.
 
 ## Gotchas
@@ -22,13 +23,15 @@ Hub window for the drink apps (Echoa, Fizz, Juice, Pour, Pulp). C# WinForms, .NE
 - Stop asks apps to close with `<App>.exe --exit` when the installed version supports it (Echoa 1.6, Fizz 1.1, Juice 1.1, Pour 1.2, Pulp 1.3), then falls back to `taskkill`. Fizz needs no admin prompt for `--exit`; only the fallback elevates.
 - Settings: `%APPDATA%\Minibar\settings.ini`, `crash.log`. Backups and downloads: `%LOCALAPPDATA%\Minibar`. Never touch another app's user data except the settings backup files it already lists.
 - Don't mark the setup's Start menu shortcut with "Added by Minibar" (StartMenu.Sync would manage it).
+- Lexend is built into `Minibar.exe` and the setup, so nothing is installed on the PC. `build.sh` puts `src/fonts/OFL.txt` in the zip as `Lexend-OFL.txt`. Pour uses the same font files.
+- Fizz and Pulp: Start also opens their window (Fizz's settings, Pulp's panel), and a running one gets an Open button (`Openable` in the app list).
 - The live GitHub API, tar.exe/PowerShell unzip, UAC, shortcuts and tray behaviour can't be tested in the Linux workspace.
 
 ## Releasing
 When a change is ready to ship, leave it fully done, so the release can go out without rebuilding or repackaging:
 1. Bump the version (see Build and test), add the "what's new" to the README and to `README.txt` in the zip (a "NEW IN x.y.z" section at the top, plain words), and run the tests.
 2. Build the exe from the final source, last, after the final change. The exe you leave is the one that ships. Copy it to `C:\Claude Projects\Minibar\Minibar.exe` so it can be tried.
-3. Build the full release zip `Minibar-x.y.z.zip`: three files: `Minibar-Setup-x.y.z.exe`, the zip (`Minibar/Minibar.exe`, `Minibar.exe.config`, `README.txt`) and a loose `Minibar.exe`. Never drop the zip (see Release rules). Save it to `C:\Claude Projects\Releases\Minibar-x.y.z\`. A zip with only the exe is not a release zip.
+3. Build the full release zip `Minibar-x.y.z.zip`: three files: `Minibar-Setup-x.y.z.exe`, the zip (`Minibar/Minibar.exe`, `Minibar.exe.config`, `README.txt`, `Lexend-OFL.txt`) and a loose `Minibar.exe`. Never drop the zip (see Release rules). Save it to `C:\Claude Projects\Releases\Minibar-x.y.z\`. A zip with only the exe is not a release zip.
 4. Push the branch. Push to `main` when the owner says push or release. Never force-push. Tags are plain versions (`vX.Y.Z`) and are created on GitHub when the owner publishes.
 5. Do not create the GitHub release or tag yourself. The owner attaches the zip and clicks Publish. The "My project apps" chat prepares the release page and checks it afterwards; it does not rebuild.
 6. Finish with one message: what changed in short plain bullets (these become the release notes, no dashes), the version, the exe's SHA256, the zip path, the tests run, and what only real Windows can check.
