@@ -38,6 +38,7 @@ static class SideTest
             {
                 Console.WriteLine("Minibar side menu tests in " + home);
                 Logic();
+                V200();
                 Window();
                 Console.WriteLine();
                 Console.WriteLine(fail == 0 ? "ALL " + pass + " PASSED" : fail + " FAILED, " + pass + " passed");
@@ -46,6 +47,32 @@ static class SideTest
         }
         finally { try { Directory.Delete(home, true); } catch { } }
         return code;
+    }
+
+    // ---------------------------------------------------------------- 2.0.0: Refill's card, .old copies
+    static void V200()
+    {
+        var names = Catalog.All.Select(x => x.Name).ToList();
+        Ok(names.Count == 6 && names.IndexOf("Refill") == names.IndexOf("Pour") + 1, "Refill is the 6th app, right below Pour", string.Join(",", names));
+        var r = Catalog.All.First(x => x.Name == "Refill");
+        Ok(r.RunName == "Refill" && r.RunArgs == "--watch" && r.StartArgs == "--watch" && r.Repos.SequenceEqual(new[] { "refill" }) && r.ExitSince == new Version(1, 0) && r.Openable,
+            "Refill: Run value 'Refill' --watch, repo refill, --exit since 1.0, Start opens its window");
+        Ok(names.Last() == "Fizz", "Fizz stays last (its notice)");
+
+        // a fake exe with no version resource: the name decides
+        string dir = Path.Combine(home, "juice"); Directory.CreateDirectory(dir);
+        string Fake(string n) { string p = Path.Combine(dir, n); File.WriteAllBytes(p, new byte[] { 0x4D, 0x5A }); return p; }
+        var juice = Catalog.All.First(x => x.Name == "Juice");
+        string old = Fake("Juice.old.exe"), oldTick = Fake("Juice.old-638123.exe"), other = Fake("Pulp.old.exe");
+        Ok(!Apps.IsAppExe(old, juice), "Juice.old.exe is never picked as Juice's exe");
+        Ok(Apps.IsAppExe(old, juice, allowOld: true) && Apps.IsAppExe(oldTick, juice, allowOld: true), "but a running Juice.old.exe counts as Juice running");
+        Ok(!Apps.IsAppExe(other, juice, allowOld: true), "Pulp.old.exe isn't Juice");
+        Ok(Apps.IsOldCopy(old) && !Apps.IsOldCopy(Fake("Juice.exe")), "IsOldCopy");
+        // Locate never follows a running .old copy
+        var a = new AppInfo(juice);
+        var s = Settings.Load();
+        Apps.Locate(a, s, old);
+        Ok(a.Exe == null || !Apps.IsOldCopy(a.Exe), "Locate ignores a running .old path", a.Exe ?? "");
     }
 
     // ---------------------------------------------------------------- plain logic

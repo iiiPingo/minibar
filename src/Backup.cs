@@ -18,7 +18,7 @@ namespace Minibar
 #pragma warning restore CS0649
 
         static readonly string[] KeepExt = { ".ini", ".txt", ".json", ".cfg", ".xml", ".csv" };
-        static readonly string[] SkipNames = { "crash.log", "status.txt", "sensors.txt", "juice.log", "diagnostics.txt" };
+        static readonly string[] SkipNames = { "crash.log", "status.txt", "sensors.txt", "juice.log", "diagnostics.txt", "snapshot.txt", "left.txt" };   // Refill's snapshot / left-alone list belong to this PC
 
         public static List<string> SettingsFiles(string dir)
         {

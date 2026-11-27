@@ -1,5 +1,16 @@
-MINIBAR 1.9.0
-Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
+MINIBAR 2.0.0
+Home for your drink apps: Echoa, Fizz, Juice, Pour, Pulp and Refill in one window.
+
+NEW IN 2.0.0: Refill joins
+- Refill (download sorter) is the 6th app, right below Pour. Install, Start, Stop,
+  Open, Start with Windows, updates, backups and the Start menu shortcut all work for
+  it like for the others. Start opens Refill's window; in the background only its
+  small hidden watcher runs.
+- A fresh Refill (1.1.0 and newer) makes its own folder, C:\Users\<you>\Refill, and
+  sorts into it. Nothing to pick on first start.
+- Fixed: an app could show "Not running" while it was running, when it ran from a
+  leftover copy like Juice.old.exe. Minibar now sees it, and never picks or starts
+  an .old copy again.
 
 NEW IN 1.9.0: the side menu shows more
 - Devices: battery levels from Juice (up to 4), red at 20% or lower, a bolt while

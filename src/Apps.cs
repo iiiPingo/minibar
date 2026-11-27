@@ -57,6 +57,9 @@ namespace Minibar
                        "Not yet: Razer, Corsair, HyperX and other brands' own USB receivers. Right-click Juice > Diagnostics shows everything it can see."
             },
             new AppDef { Name = "Pour", Blurb = "Video downloader", RunName = "Pour", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pour"), Highlights = "Copy a link, get MP4 or MP3 up to 2K  \u00b7  whole playlists", Repos = new[] { "pour" }, ExitSince = new Version(1, 2), WaitForWork = true },
+            // 2.0.0: Refill joins, right below Pour. Its hidden watcher (--watch) is what runs in the background;
+            // Start / Open show its window (which also starts the watcher). --exit closes both.
+            new AppDef { Name = "Refill", Blurb = "Download sorter", RunName = "Refill", RunArgs = "--watch", StartArgs = "--watch", DataDir = e => Roam("Refill"), Highlights = "Sorts new downloads into tidy folders  \u00b7  Undo for every move  \u00b7  waits until a download is done", Repos = new[] { "refill" }, ExitSince = new Version(1, 0), Openable = true },
             new AppDef { Name = "Pulp", Blurb = "Clipboard history", RunName = "Pulp", RunArgs = "--tray", StartArgs = "--tray", DataDir = e => Roam("Pulp"), Highlights = "Ctrl+Alt+V history with search and pins  \u00b7  strips tracking from links  \u00b7  screenshots too", Repos = new[] { "pulp" }, ExitSince = new Version(1, 3), Openable = true },
             // Fizz last: its card can carry the PawnIO / anti-cheat notice
             new AppDef { Name = "Fizz", Blurb = "In-game overlay", TaskName = "Fizz", DataDir = e => Roam("Fizz"), Highlights = "FPS + 1% low, temps, load, RAM and VRAM  \u00b7  easy to customize  \u00b7  nothing injected into games", Repos = new[] { "fizz" }, ExitSince = new Version(1, 1), NeedsAdmin = true, Openable = true },
@@ -211,11 +214,22 @@ namespace Minibar
         static bool DownloadName(string file, string app) =>
             System.Text.RegularExpressions.Regex.IsMatch(file, "^" + System.Text.RegularExpressions.Regex.Escape(app) + @"(\s*\(\d+\))*\.exe$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        public static bool IsAppExe(string path, AppDef d)
+        public static bool IsOldCopy(string path) => path != null && Path.GetFileName(path).IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        // allowOld: only for "is this process the app?". A running exe renamed during an update (Juice.old.exe, which
+        // then wrote its own startup entry) is still the app running; it's just never picked as the exe to show or start.
+        public static bool IsAppExe(string path, AppDef d, bool allowOld = false)
         {
             if (string.IsNullOrEmpty(path) || d == null) return false;
             string file = Path.GetFileName(path);
-            if (!file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || file.IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (!file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || (!allowOld && IsOldCopy(path))) return false;
+            if (allowOld && IsOldCopy(path))
+            {
+                // "Juice.old.exe", "Pour.old-123.exe": what's left of the name must be the app's, and the version resource must not say otherwise
+                if (!file.StartsWith(d.Name + ".old", StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) return false;
+                var p = (ProductOf(path) ?? "").Split('|');
+                return !p.Any(x => x.Length > 0) || p.Any(x => x.Equals(d.Name, StringComparison.OrdinalIgnoreCase));
+            }
             if (!File.Exists(path)) return false;
             // its own name: always (as before; an old Echoa build may still say "Sip" inside)
             if (file.Equals(d.Name + ".exe", StringComparison.OrdinalIgnoreCase)) return true;
@@ -332,7 +346,7 @@ namespace Minibar
         {
             string exe = null, src = null;
             if (s.Located.TryGetValue(a.Def.Name, out var loc) && File.Exists(loc)) { exe = loc; src = "located"; }
-            else if (runningPath != null && File.Exists(runningPath)) { exe = runningPath; src = "running"; }
+            else if (runningPath != null && File.Exists(runningPath) && !IsOldCopy(runningPath)) { exe = runningPath; src = "running"; }
             else
             {
                 string run = ExeFromCommand(RunValue(a.Def.RunName));
@@ -395,7 +409,13 @@ namespace Minibar
             {
                 var l = byName[a.Def.Name];
                 string path = null;
-                foreach (var t in l) { path = Native.ProcessPath(t.Item1); if (path != null) break; }
+                // prefer a process running from the real exe; a leftover .old copy only counts as "running"
+                foreach (var t in l)
+                {
+                    string p = Native.ProcessPath(t.Item1);
+                    if (p == null || IsOldCopy(p)) continue;
+                    path = p; break;
+                }
                 bool wasRunning = a.Running;
                 a.Running = l.Count > 0;
                 a.Pids = l.Select(t => t.Item1).ToList();
@@ -446,7 +466,7 @@ namespace Minibar
             bool picked = a.Exe != null && n.Equals(Path.GetFileNameWithoutExtension(a.Exe), StringComparison.OrdinalIgnoreCase);
             if (!picked && !n.StartsWith(a.Def.Name, StringComparison.OrdinalIgnoreCase)) return false;
             string path = Native.ProcessPath(p.Id);
-            return path != null && (SameFile(path, a.Exe) || IsAppExe(path, a.Def));
+            return path != null && (SameFile(path, a.Exe) || IsAppExe(path, a.Def, allowOld: true));
         }
 
         // Start from the card for an app that shows nothing when it starts: start it and show its window

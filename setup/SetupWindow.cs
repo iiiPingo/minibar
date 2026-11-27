@@ -109,7 +109,7 @@ namespace MinibarSetup
             if (uninstall)
             {
                 head = "Remove Minibar from this PC";
-                body = "Removes its folder, its shortcuts and its entry in Installed apps. Echoa, Fizz, Juice, Pour and Pulp stay installed and keep working.";
+                body = "Removes its folder, its shortcuts and its entry in Installed apps. Echoa, Fizz, Juice, Pour, Pulp and Refill stay installed and keep working.";
                 if (!Directory.Exists(Inst.Dir) && !Inst.Registered) { head = "Minibar isn't installed"; body = "There's nothing to remove."; primary.Enabled = false; option.Visible = false; secondary.Text = "Close"; }
                 return;
             }
