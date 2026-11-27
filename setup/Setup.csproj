@@ -13,7 +13,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <!-- same version as Minibar (build.sh passes -p:Version=...) -->
-    <Version>1.8.0</Version>
+    <Version>1.9.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Minibar Setup</Product>
     <AssemblyTitle>Minibar Setup</AssemblyTitle>

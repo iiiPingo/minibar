@@ -1,5 +1,18 @@
-MINIBAR 1.8.0
+MINIBAR 1.9.0
 Home for your drink apps: Echoa, Fizz, Juice, Pour and Pulp in one window.
+
+NEW IN 1.9.0: the side menu shows more
+- Devices: battery levels from Juice (up to 4), red at 20% or lower, a bolt while
+  charging. Needs Juice 1.4.0 or newer, running. Hidden when Juice is closed or sees
+  no devices. In a small window it keeps the lowest batteries.
+- Refill: if Refill is running, what it sorted today and the last file it moved,
+  with Undo (puts that file back) and Pause (1 hour) / Resume.
+- Update card at the bottom: "2 updates ready" with an Update all button, or
+  "All up to date", and when Minibar last checked. Update all updates every app the
+  usual way (Pour still waits for its downloads) and Minibar itself last.
+- A number on the Updates tab when updates are ready.
+- Everything updates by itself while Minibar is open. A missing or broken status
+  file just hides its block.
 
 INSTALL (two ways, both update themselves the same way)
 - Setup: run Minibar-Setup-x.y.z.exe and click Install. It installs just for you (no

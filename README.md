@@ -8,6 +8,7 @@ One window for the drink apps: **Echoa**, **Fizz**, **Juice**, **Pour** and **Pu
 - Back up and restore every app's settings in one zip.
 - Install button: anything not on this PC installs from GitHub in one click (so new users only need Minibar).
 - Fizz notice: what Fizz needs installed (PawnIO) and the anti-cheat note, with download links.
+- Side menu (new in 1.9.0): device batteries from Juice, Refill's last move with Undo and Pause, an update card with Update all, and a count on the Updates tab.
 
 ## Install
 
@@ -31,6 +32,8 @@ dotnet build -c Release
 
 The setup carries the built Minibar.exe inside it, so build `src` first, then `dotnet build setup -c Release`.
 On Linux, `./build.sh` does both and writes the release files (zip, setup, exe) into `release/`.
+
+Side menu tests (safe to run on Windows, they use a temp folder): `dotnet build tests/sidemenu -c Release`, then `tests\sidemenu\bin\Release\net48\SideMenuTests.exe` (add `render <folder>` for pictures).
 
 ## Third-party
 

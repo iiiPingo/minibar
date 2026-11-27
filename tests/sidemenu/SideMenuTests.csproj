@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Minibar 1.9.0 side menu tests (Devices, Refill, update card). Safe on Windows: Minibar's settings go to a temp
+       folder (MINIBAR_DATA), the Start menu and registry are left alone.
+       Run: bin\Release\net48\SideMenuTests.exe            (exit code 0 = all passed)
+            bin\Release\net48\SideMenuTests.exe render <dir>   (pictures of the side menu) -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <StartupObject>SideTest</StartupObject>
+    <Version>1.9.0</Version>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>none</DebugType>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <ApplicationManifest>..\..\src\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>/usr/lib/mono/4.8-api</FrameworkPathOverride>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Compile Include="Test.cs" />
+    <Compile Include="..\..\src\*.cs" />
+    <EmbeddedResource Include="..\..\src\fonts\Lexend-Medium.ttf" LogicalName="fonts.Lexend-Medium.ttf" />
+    <EmbeddedResource Include="..\..\src\fonts\Lexend-Bold.ttf" LogicalName="fonts.Lexend-Bold.ttf" />
+    <EmbeddedResource Include="..\..\src\minibar.ico" LogicalName="minibar.ico" />
+    <EmbeddedResource Include="..\..\src\appicons\*.png" LogicalName="appicon.%(Filename).png" />
+  </ItemGroup>
+</Project>

@@ -36,6 +36,14 @@ namespace Minibar
         FlatBtn forget;
         Label backupNote;
         Font fLogoText;
+        // side menu blocks (Devices, Refill, update card)
+        SideLayout side = new SideLayout { DevicesTop = -1, RefillTop = -1, DividerY = -1 };
+        List<Device> devices = new List<Device>(), shownDevices = new List<Device>();
+        RefillStatus refill;
+        bool refillBusy, selfAfterAll;
+        FlatBtn undoBtn, pauseBtn, updateAllBtn;
+        string sideSig;
+        Font fSideHead, fSideName, fSideDev, fSideSmall, fSideIcon, fSideBolt;
         int workers;               // installs / updates / rollbacks running right now
         bool closeWhenDone;        // closed while one was running: hidden until it's finished, then closes
 
@@ -73,6 +81,7 @@ namespace Minibar
             BuildApps();
             BuildUpdates();
             BuildSettings();
+            BuildSide();
             ShowPage(0);
 
             // first look: find every app, read start-with-Windows, then keep the running state fresh while the window is open
@@ -84,7 +93,7 @@ namespace Minibar
             RefreshBackups();
             timer = new Timer { Interval = 1500 };
             // minimized (or hidden to the tray): no full rescan, but a queued update still goes in once Pour is done
-            timer.Tick += (o, e) => { if (WindowState != FormWindowState.Minimized) Rescan(); else RunQueue(true); };
+            timer.Tick += (o, e) => { if (WindowState != FormWindowState.Minimized) Rescan(); else { RunQueue(true); MaybeSelfLast(); } };
             timer.Start();
         }
 
@@ -182,6 +191,7 @@ namespace Minibar
         {
             base.OnResize(e);
             if (WindowState == FormWindowState.Minimized && st.MinimizeToTray && Visible) HideToTray();
+            RefreshSide(true);
             Invalidate();
         }
 
@@ -345,6 +355,7 @@ namespace Minibar
 
         void UpdateCheckedText()
         {
+            RefreshSide(false);
             if (updSub == null) return;
             if (checking) { updSub.Text = "Checking GitHub…"; return; }
             int n = AllRows.Count(a => a.Found && Updater.State(a) == UpdState.Available);
@@ -526,6 +537,7 @@ namespace Minibar
                     Rescan();
                     ulist.Invalidate();
                     UpdateCheckedText();
+                    MaybeSelfLast();
                 });
         }
 
@@ -713,6 +725,8 @@ namespace Minibar
                       + (found < apps.Count ? "  ·  " + (apps.Count - found) + " not installed" : "");
                 list.Invalidate();
                 if (page == 1) { ulist.Invalidate(); UpdateCheckedText(); }
+                MaybeSelfLast();
+                RefreshSide(false);
             }
             catch (Exception ex) { Log.Crash(ex); }
         }
@@ -869,6 +883,204 @@ namespace Minibar
             }
         }
 
+        // ------------------------------------------------------------ side menu: Devices, Refill, update card
+        int ReadyCount() => AllRows.Count(a => a.Found && Updater.State(a) == UpdState.Available);
+        bool UpdatesBusy => self.Updating || selfAfterAll || apps.Any(a => a.Updating || a.Queued);
+
+        void BuildSide()
+        {
+            fSideHead = Theme.UiSemi(9f);
+            fSideName = Theme.UiSemi(9.5f);
+            fSideDev = Theme.UiSemi(9f);
+            fSideSmall = Theme.Ui(9f);
+            fSideBolt = new Font(Theme.IconFont, 8.5f);
+            fSideIcon = new Font(Theme.IconFont, 10f);
+            FlatBtn Btn(string text, bool primary, Action click)
+            {
+                var b = new FlatBtn(text, s, primary) { BackColor = Theme.Nav, Visible = false, Font = Theme.UiSemi(9.5f), TabStop = false };
+                b.Click += (o, e) => { try { click(); } catch (Exception ex) { Log.Crash(ex); } };
+                Controls.Add(b);
+                return b;
+            }
+            undoBtn = Btn("Undo", false, () => RunRefill("--undo-last"));
+            pauseBtn = Btn("Pause", false, () => RunRefill(refill != null && SideMenu.IsPaused(refill, DateTime.UtcNow) ? "--resume" : "--pause 60"));
+            updateAllBtn = Btn("Update all", true, UpdateAll);
+        }
+
+        // reads Juice's and Refill's status files and lays the blocks out; repaints only when something shows differently
+        void RefreshSide(bool force)
+        {
+            try
+            {
+                if (undoBtn == null) return;   // still being built
+                var now = DateTime.UtcNow;
+
+                // Devices: Juice running and writing its status file
+                var juice = apps.FirstOrDefault(a => a.Def.Name == "Juice");
+                devices = juice != null && juice.Found && juice.Running ? SideMenu.ParseJuice(SideMenu.ReadSmall(Path.Combine(juice.DataDir, "status.txt"))) : new List<Device>();
+
+                // Refill: status file there, its exe there, and Refill running
+                RefillStatus r = null;
+                if (SideMenu.RefillRunning())
+                {
+                    r = SideMenu.ParseRefill(SideMenu.ReadSmall(SideMenu.RefillStatusPath));
+                    if (r != null && !File.Exists(r.Exe)) r = null;
+                }
+                refill = r;
+
+                int ready = ReadyCount();
+                bool busy = UpdatesBusy;
+                side = SideMenu.Arrange(ClientSize.Height, s, devices.Count, refill != null, ready > 0 && !busy && !checking);
+                shownDevices = SideMenu.Pick(devices, side.DevicesShown);
+
+                // the buttons
+                int bx = S(18), bw = NavW - S(36), half = (bw - S(8)) / 2;
+                bool showRefill = side.RefillTop >= 0;
+                if (showRefill)
+                {
+                    int by = side.RefillTop + S(SideMenu.RefillH) - S(32);
+                    undoBtn.Bounds = new Rectangle(bx, by, half, S(32));
+                    pauseBtn.Bounds = new Rectangle(bx + half + S(8), by, bw - half - S(8), S(32));
+                    bool paused = SideMenu.IsPaused(refill, now);
+                    pauseBtn.Text = paused ? (refill.Paused == "off" ? "Turn on" : "Resume") : "Pause";
+                    undoBtn.Enabled = !refillBusy && !string.IsNullOrEmpty(refill.LastFile);
+                    pauseBtn.Enabled = !refillBusy;
+                }
+                undoBtn.Visible = pauseBtn.Visible = showRefill;
+                if (side.CardButton)
+                {
+                    updateAllBtn.Bounds = new Rectangle(S(24), side.CardTop + side.CardHeight - S(12) - S(32), NavW - S(48), S(32));
+                    updateAllBtn.Enabled = true;
+                }
+                updateAllBtn.Visible = side.CardButton;
+
+                string sig = string.Join("|", side.DevicesTop, side.DevicesShown, side.RefillTop, side.CardTop, side.CardButton, ready, busy, checking,
+                    string.Join(",", shownDevices.Select(d => d.Type + d.Percent + d.Charging + d.Name)),
+                    refill == null ? "" : SideMenu.RefillBadge(refill, now) + SideMenu.RefillLine(refill, now) + refillBusy,
+                    st.LastCheck == DateTime.MinValue ? "" : SideMenu.Ago(now - st.LastCheck), Theme.Accent.ToArgb());
+                if (force || sig != sideSig)
+                {
+                    sideSig = sig;
+                    Invalidate(new Rectangle(0, 0, NavW, ClientSize.Height));
+                }
+            }
+            catch (Exception ex) { Log.Crash(ex); }
+        }
+
+        void DrawSide(Graphics g)
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+                int x = S(18), w = NavW - S(36);
+                var left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+                var right = TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+
+                if (side.DevicesTop >= 0)
+                {
+                    int y = side.DevicesTop;
+                    TextRenderer.DrawText(g, "Devices", fSideHead, new Rectangle(x, y, w, S(SideMenu.DevHeader)), Theme.Sub, left);
+                    y += S(SideMenu.DevHeader);
+                    foreach (var d in shownDevices)
+                    {
+                        Color c = d.Low ? Theme.Red : Theme.Accent;
+                        TextRenderer.DrawText(g, SideMenu.Glyph(d.Type), fSideIcon, new Rectangle(x - S(2), y, S(22), S(22)), Theme.Sub, Ux.C);
+                        string pct = d.Percent + "%";
+                        int pw = TextRenderer.MeasureText(g, pct, fSideHead, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width + S(2);
+                        TextRenderer.DrawText(g, pct, fSideHead, new Rectangle(x + w - pw, y, pw, S(22)), d.Low ? Theme.Red : Theme.Sub, right | TextFormatFlags.NoPadding);
+                        int bolt = d.Charging ? S(13) : 0;
+                        if (d.Charging) TextRenderer.DrawText(g, "\uE945", fSideBolt, new Rectangle(x + w - pw - bolt, y, bolt, S(22)), Theme.Accent, Ux.C);   // lightning bolt
+                        TextRenderer.DrawText(g, d.Name, fSideDev, new Rectangle(x + S(24), y, w - S(24) - pw - bolt - S(3), S(22)), Theme.Text, left | TextFormatFlags.NoPadding);
+                        var track = new RectangleF(x + S(24), y + S(26), w - S(24), S(5));
+                        Theme.Fill(g, track, Color.FromArgb(58, 58, 58), S(2.5f));
+                        float fw = Math.Max(S(5), track.Width * d.Percent / 100f);
+                        Theme.Fill(g, new RectangleF(track.X, track.Y, fw, track.Height), c, S(2.5f));
+                        y += S(SideMenu.DevRow);
+                    }
+                }
+                if (side.DividerY >= 0)
+                    using (var pen = new Pen(Color.FromArgb(48, 48, 48), Math.Max(1, s))) g.DrawLine(pen, x, side.DividerY, x + w, side.DividerY);
+
+                if (side.RefillTop >= 0 && refill != null)
+                {
+                    int y = side.RefillTop;
+                    TextRenderer.DrawText(g, "Refill", fSideHead, new Rectangle(x, y, w / 2, S(22)), Theme.Sub, left);
+                    TextRenderer.DrawText(g, SideMenu.RefillBadge(refill, now), fSideSmall, new Rectangle(x + w / 3, y, w - w / 3, S(22)), Theme.Sub, right);
+                    TextRenderer.DrawText(g, SideMenu.RefillLine(refill, now), fSideName, new Rectangle(x, y + S(24), w, S(22)), Theme.Text, left);
+                }
+
+                // the update card
+                var card = new Rectangle(S(12), side.CardTop, NavW - S(24), side.CardHeight);
+                Theme.Fill(g, card, Color.FromArgb(34, 34, 34), S(8));
+                Theme.Stroke(g, card, Color.FromArgb(50, 50, 50), S(8), Math.Max(1, s));
+                int ready = ReadyCount();
+                bool ever = st.LastCheck != DateTime.MinValue;
+                string title = SideMenu.UpdateTitle(ready, checking, UpdatesBusy, ever);
+                string sub = UpdatesBusy ? (apps.Any(a => a.Queued) ? "Waiting for Pour" : "Settings are kept")
+                    : checking ? "Asking GitHub" : ever ? "Checked " + SideMenu.Ago(now - st.LastCheck) : "Check on the Updates page";
+                Theme.Disc(g, new PointF(card.X + S(16), card.Y + S(12) + S(11)), S(4), ever || checking || UpdatesBusy ? Theme.Accent : Theme.Dim);
+                TextRenderer.DrawText(g, title, fSideName, new Rectangle(card.X + S(26), card.Y + S(12), card.Width - S(34), S(22)), Theme.Text, left);
+                TextRenderer.DrawText(g, sub, fSideSmall, new Rectangle(card.X + S(12), card.Y + S(36), card.Width - S(20), S(20)), Theme.Sub, left);
+            }
+            catch (Exception ex) { Log.Crash(ex); }
+        }
+
+        void DrawBadge(Graphics g, Rectangle navItem, int n)
+        {
+            if (n <= 0) return;
+            string t = n > 9 ? "9+" : n.ToString();
+            float d = S(20), wd = n > 9 ? S(26) : d;
+            var r = new RectangleF(navItem.Right - S(10) - wd, navItem.Y + (navItem.Height - d) / 2f, wd, d);
+            Theme.Fill(g, r, Theme.Accent, d / 2f);
+            TextRenderer.DrawText(g, t, fSideHead, Rectangle.Round(r), Color.FromArgb(20, 20, 20), Ux.C);
+        }
+
+        // Update all: every app with an update, the usual way (a running app closes and reopens, Pour waits for its downloads),
+        // and Minibar itself last, once the others are done (it restarts)
+        void UpdateAll()
+        {
+            foreach (var a in apps.Where(x => !x.Queued && Updater.CanUpdate(x)).ToList()) StartInstall(a);
+            if (Updater.CanUpdate(self)) selfAfterAll = true;
+            MaybeSelfLast();
+            RefreshSide(true);
+            list.Invalidate(); ulist.Invalidate();
+        }
+
+        void MaybeSelfLast()
+        {
+            if (!selfAfterAll) return;
+            if (apps.Any(x => x.Updating || x.Queued) || Volatile.Read(ref workers) > 0) return;
+            selfAfterAll = false;
+            if (Updater.CanUpdate(self)) StartSelfUpdate();
+            RefreshSide(true);
+        }
+
+        // Refill.exe --undo-last / --pause 60 / --resume, in the background; the block updates from Refill's status file
+        void RunRefill(string args)
+        {
+            var r = refill;
+            if (r == null || refillBusy) return;
+            refillBusy = true;
+            RefreshSide(true);
+            string exe = r.Exe;
+            Task.Run(() =>
+            {
+                try
+                {
+                    using (var p = Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(exe) }))
+                        p?.WaitForExit(15000);
+                }
+                catch (Exception ex) { Log.Crash(ex); }
+                Ui(() => { refillBusy = false; RefreshSide(true); });
+            });
+        }
+
+        // for the offscreen renders and tests
+        public void RefreshSideForTest() => RefreshSide(true);
+        public SideLayout SideForTest => side;
+        public List<Device> ShownDevicesForTest => shownDevices;
+        public IEnumerable<Control> SideButtonsForTest => new Control[] { undoBtn, pauseBtn, updateAllBtn };
+
         // ------------------------------------------------------------ nav
         Rectangle NavItem(int i) => new Rectangle(S(10), S(70) + i * S(40), NavW - S(20), S(36));
 
@@ -898,8 +1110,10 @@ namespace Minibar
                 Color nc = i == page ? Theme.Text : Theme.Sub;
                 TextRenderer.DrawText(g, navGlyphs[i], fNavIcon, new Rectangle(r.X + S(14), r.Y, S(20), r.Height), nc, Ux.C);
                 TextRenderer.DrawText(g, pages[i], fNav, new Rectangle(r.X + S(44), r.Y, r.Width - S(44), r.Height), nc, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                if (i == 1) DrawBadge(g, r, ReadyCount());
             }
-            TextRenderer.DrawText(g, "Version " + Application.ProductVersion, fSmall, new Rectangle(S(18), ClientSize.Height - S(40), NavW - S(20), S(20)), Theme.Dim, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+            DrawSide(g);
+            TextRenderer.DrawText(g, "Version " + Application.ProductVersion, fSmall, new Rectangle(S(18), side.VersionY, NavW - S(20), S(20)), Theme.Dim, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
@@ -925,6 +1139,7 @@ namespace Minibar
         public List<AppInfo> AppsForTest => apps;
         void SyncStartMenu()
         {
+            if (Settings.Sandbox != null) return;   // tests and trial runs leave the real Start menu alone
             string self = null;
             try { self = Application.ExecutablePath; } catch { }
             if (self != null && Path.GetFileName(self).IndexOf(".old", StringComparison.OrdinalIgnoreCase) >= 0) self = null;   // mid self-update

@@ -10,7 +10,9 @@ namespace Minibar
     // %APPDATA%\Minibar\settings.ini: plain key=value lines, readable and hand-editable
     class Settings
     {
-        public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Minibar");
+        // MINIBAR_DATA (tests, trial runs): settings in that folder instead, and Minibar leaves the Start menu alone
+        public static string Sandbox => Environment.GetEnvironmentVariable("MINIBAR_DATA") is string d && d.Trim().Length > 0 ? d : null;
+        public static string Dir => Sandbox ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Minibar");
         public static string FilePath => Path.Combine(Dir, "settings.ini");
 
         public string Accent = "";                       // empty = honey
