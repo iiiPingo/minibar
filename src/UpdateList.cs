@@ -39,7 +39,8 @@ namespace Minibar
         int TextW(Graphics g, string t, Font f) => TextRenderer.MeasureText(g, t, f, new Size(int.MaxValue, int.MaxValue), Measure).Width;
         int RowH => S(84);
 
-        static readonly Color RowBg = Color.FromArgb(43, 43, 43), RowEdge = Color.FromArgb(56, 56, 56);
+        static Color RowBg => Theme.Tile;
+        static Color RowEdge => Theme.TileEdge;
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -92,8 +93,8 @@ namespace Minibar
             }
             int pw = TextW(g, pill, fPill) + S(22);
             var pr = new Rectangle(x + nw + S(10), r.Y + S(18), pw, S(22));
-            Theme.Fill(g, pr, accent ? Color.FromArgb(40, Theme.Accent) : Color.FromArgb(54, 54, 54), pr.Height / 2f);
-            TextRenderer.DrawText(g, pill, fPill, pr, accent ? Theme.Accent : Theme.Sub, Ux.C);
+            Theme.Fill(g, pr, accent ? Color.FromArgb(40, Theme.Accent) : Theme.Chip, pr.Height / 2f);
+            TextRenderer.DrawText(g, pill, fPill, pr, accent ? Theme.AccentText : Theme.Sub, Ux.C);
 
             // right side, laid out from the right edge
             int right = r.Right - S(16), cy = r.Y + (r.Height - S(32)) / 2;
@@ -106,10 +107,10 @@ namespace Minibar
                 var sw = new RectangleF(tr.X, cy + S(6), S(40), S(20));
                 bool th = Hov(a, "auto");
                 if (on) Theme.Fill(g, sw, th ? Theme.AccentHover : Theme.Accent, sw.Height / 2);
-                else { if (th) Theme.Fill(g, sw, Color.FromArgb(58, 58, 58), sw.Height / 2); Theme.Stroke(g, sw, th ? Theme.Text : Theme.Sub, sw.Height / 2, Math.Max(1, s)); }
+                else { if (th) Theme.Fill(g, sw, Theme.Hover, sw.Height / 2); Theme.Stroke(g, sw, th ? Theme.Text : Theme.Sub, sw.Height / 2, Math.Max(1, s)); }
                 float d = on ? S(12) : S(10);
                 float kx = on ? sw.Right - S(4) - d : sw.X + S(5);
-                Theme.Disc(g, new PointF(kx + d / 2, sw.Y + sw.Height / 2), d / 2, on ? Color.FromArgb(24, 24, 24) : Theme.Sub);
+                Theme.Disc(g, new PointF(kx + d / 2, sw.Y + sw.Height / 2), d / 2, on ? Theme.Ink : Theme.Sub);
                 TextRenderer.DrawText(g, tl, fChip, new Rectangle(tr.X + S(48), cy, tw - S(48), S(32)), Theme.Sub, Ux.L);
                 Hit(tr, "auto", a);
                 right = tr.X - S(16);
@@ -118,7 +119,7 @@ namespace Minibar
             {
                 int bw = Math.Max(S(120), TextW(g, a.Busy, fBtn) + S(30));
                 var br = new Rectangle(right - bw, cy, bw, S(32));
-                Theme.Fill(g, br, Color.FromArgb(50, 50, 50), S(7));
+                Theme.Fill(g, br, Theme.BtnOff, S(7));
                 TextRenderer.DrawText(g, a.Busy, fBtn, br, Theme.Sub, Ux.C);
                 right = br.X - S(8);
             }
@@ -131,7 +132,7 @@ namespace Minibar
                 var br = new Rectangle(right - bw, cy, bw, S(32));
                 if (a.Queued) Theme.Fill(g, br, Color.FromArgb(h ? 60 : 34, Theme.Accent), S(7));
                 else Theme.Fill(g, br, h ? Theme.AccentHover : Theme.Accent, S(7));
-                TextRenderer.DrawText(g, t, fBtn, br, a.Queued ? Theme.Accent : Color.FromArgb(22, 22, 22), Ux.C);
+                TextRenderer.DrawText(g, t, fBtn, br, a.Queued ? Theme.AccentText : Theme.Ink, Ux.C);
                 Hit(br, "update", a);
                 right = br.X - S(8);
             }
@@ -155,7 +156,7 @@ namespace Minibar
             var l2 = Rectangle.FromLTRB(x, r.Y + S(44), Math.Max(x + S(40), right - S(8)), r.Y + S(66));
             var lf = Ux.L | TextFormatFlags.EndEllipsis;
             if (gh == null) TextRenderer.DrawText(g, a.Error, fSmall, l2, Theme.Red, lf);
-            else if (a.Note != null && DateTime.Now < a.NoteUntil) TextRenderer.DrawText(g, a.Note, fSmall, l2, Theme.Accent, lf);
+            else if (a.Note != null && DateTime.Now < a.NoteUntil) TextRenderer.DrawText(g, a.Note, fSmall, l2, Theme.AccentText, lf);
             else TextRenderer.DrawText(g, have + "   ·   " + gh, fSmall, l2, Theme.Dim, lf);
         }
 
@@ -165,8 +166,8 @@ namespace Minibar
             int w = TextW(g, text, fChip) + S(24);
             var r = new Rectangle(right - w, y, w, S(32));
             bool hv = Hov(a, id);
-            if (hv) Theme.Fill(g, r, Color.FromArgb(58, 58, 58), S(7));
-            else Theme.Stroke(g, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), Color.FromArgb(64, 64, 64), S(7), Math.Max(1, s));
+            if (hv) Theme.Fill(g, r, Theme.Hover, S(7));
+            else Theme.Stroke(g, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), Theme.ChipEdge, S(7), Math.Max(1, s));
             TextRenderer.DrawText(g, text, fChip, r, hv ? Theme.Text : Theme.Sub, Ux.C);
             Hit(r, id, a);
             return w;

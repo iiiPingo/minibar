@@ -1,6 +1,14 @@
-MINIBAR 2.1.0
+MINIBAR 2.1.1
 Home for your drink apps: Echoa, Fizz, Juice, Pour, Pulp and Refill in one window.
 
+NEW IN 2.1.1: Theme
+- Settings has a new Theme picker: Dark, OLED or Light. It changes the whole window
+  right away (Apps, Updates, Displays, Settings and the title bar).
+- Dark is the look Minibar always had, and stays the default.
+- OLED is pure black, with near-black cards and thin borders. Nice on OLED screens.
+- Light is the Windows 11 light look: light grey window, white cards, dark text.
+- Your accent colour works with all three. The choice is saved as theme= in
+  settings.ini (dark, oled or light).
 NEW IN 2.1.0: Displays
 - A new Displays page (left menu, or Ctrl+3) with one card per screen, the main
   screen first: its real name (like "Odyssey G50SF", not "Generic PnP Monitor"),

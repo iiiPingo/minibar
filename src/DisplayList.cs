@@ -27,7 +27,8 @@ namespace Minibar
         bool wheelPending;
         int lastWheelMs;
 
-        static readonly Color CardBg = Color.FromArgb(43, 43, 43), CardEdge = Color.FromArgb(56, 56, 56);
+        static Color CardBg => Theme.Tile;
+        static Color CardEdge => Theme.TileEdge;
         const int CardH = 164;
 
         public DisplayList(float scale) : base(scale)
@@ -172,13 +173,13 @@ namespace Minibar
         {
             var rf = new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1);
             Theme.Fill(g, rf, CardBg, S(12));
-            Theme.Stroke(g, rf, Focused && focus == d ? Color.FromArgb(78, 78, 78) : CardEdge, S(12), Math.Max(1, s));
+            Theme.Stroke(g, rf, Focused && focus == d ? Theme.FocusEdge : CardEdge, S(12), Math.Max(1, s));
             int x0 = r.X + S(18), top = r.Y;
 
             // icon tile: laptop for the built-in panel, monitor otherwise
             var ir = new Rectangle(x0, top + S(16), S(44), S(44));
             Theme.Fill(g, ir, Theme.Field, S(11));
-            TextRenderer.DrawText(g, d.Internal ? "" : "", fIcon, ir, d.Primary ? Theme.Accent : Theme.Sub, Ux.C);
+            TextRenderer.DrawText(g, d.Internal ? "" : "", fIcon, ir, d.Primary ? Theme.AccentText : Theme.Sub, Ux.C);
 
             // name + Primary pill, then what kind of display it is
             int nx = ir.Right + S(16);
@@ -219,7 +220,8 @@ namespace Minibar
                 Theme.Fill(g, new RectangleF(t.X, t.Y, Math.Max(t.Height, fx - t.X), t.Height), Theme.Accent, t.Height / 2f);
                 bool hot = drag == d || hoverSlider == d;
                 var c = new PointF(fx, t.Y + t.Height / 2f);
-                Theme.Disc(g, c, S(9), Color.FromArgb(69, 69, 69));
+                Theme.Disc(g, c, S(9), Theme.Knob);
+                if (Theme.Hairline != Color.Empty) using (var kp = new Pen(Theme.Hairline, Math.Max(1, s))) g.DrawEllipse(kp, c.X - S(9), c.Y - S(9), S(18), S(18));
                 Theme.Disc(g, c, hot ? S(6) : S(5), Theme.Accent);
                 TextRenderer.DrawText(g, pct + "%", fPct, new Rectangle(r.Right - S(18) - S(52), t.Y - S(10), S(52), S(24)), Theme.Text, Ux.R);
                 sliders.Add(Tuple.Create(SliderHit(r), d));

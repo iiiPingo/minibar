@@ -102,20 +102,23 @@ namespace Minibar
         bool Hov(AppInfo a, string id) => hover == a.Def.Name + "#" + id;
         string hoverCard;
 
-        static readonly Color CardBg = Color.FromArgb(43, 43, 43), CardBgHover = Color.FromArgb(47, 47, 47), CardEdge = Color.FromArgb(56, 56, 56), Divider = Color.FromArgb(54, 54, 54);
+        static Color CardBg => Theme.Tile;
+        static Color CardBgHover => Theme.TileHover;
+        static Color CardEdge => Theme.TileEdge;
+        static Color Divider => Theme.Divider;
 
         void DrawCard(Graphics g, AppInfo a, Rectangle r)
         {
             bool hc = hoverCard == a.Def.Name;
             var rf = new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1);
             Theme.Fill(g, rf, hc ? CardBgHover : CardBg, S(12));
-            Theme.Stroke(g, rf, hc ? Color.FromArgb(66, 66, 66) : CardEdge, S(12), Math.Max(1, s));
+            Theme.Stroke(g, rf, hc ? Theme.TileEdgeHover : CardEdge, S(12), Math.Max(1, s));
             int x0 = r.X + S(18), top = r.Y;
 
             // icon with a soft shadow
             var ir = new Rectangle(x0, top + S(18), S(44), S(44));
             for (int i = 3; i >= 1; i--)
-                Theme.Fill(g, new RectangleF(ir.X - i * 0.5f, ir.Y + S(2) + i * 0.6f, ir.Width + i, ir.Height + i * 0.4f), Color.FromArgb(18, 0, 0, 0), S(11) + i);
+                Theme.Fill(g, new RectangleF(ir.X - i * 0.5f, ir.Y + S(2) + i * 0.6f, ir.Width + i, ir.Height + i * 0.4f), Theme.Shadow, S(11) + i);
             string iconKey = a.Exe ?? "builtin";
             if (a.Icon == null || a.IconFor != ir.Width || a.IconPath != iconKey)
             {
@@ -136,9 +139,9 @@ namespace Minibar
             int nw = TextW(g, a.Def.Name, fName) + S(2);
             TextRenderer.DrawText(g, a.Def.Name, fName, new Rectangle(nx, top + S(16), nw, S(26)), Theme.Text, Ux.L);
             string state; Color pillBg, dot, stc; bool hollow = false;
-            if (!a.Found) { state = "Not installed"; pillBg = Color.FromArgb(52, 52, 52); dot = Theme.Dim; stc = Theme.Sub; hollow = true; }
+            if (!a.Found) { state = "Not installed"; pillBg = Theme.Pill; dot = Theme.Dim; stc = Theme.Sub; hollow = true; }
             else if (a.Running) { state = "Running" + (a.Since != null ? "  ·  " + Uptime(DateTime.Now - a.Since.Value) : ""); pillBg = Color.FromArgb(34, Theme.Accent); dot = Theme.Accent; stc = Theme.Text; }
-            else { state = "Not running"; pillBg = Color.FromArgb(52, 52, 52); dot = Theme.Sub; stc = Theme.Sub; hollow = true; }
+            else { state = "Not running"; pillBg = Theme.Pill; dot = Theme.Sub; stc = Theme.Sub; hollow = true; }
             int pw = TextW(g, state, fPill) + S(30);
             var pill = new Rectangle(nx + nw + S(12), top + S(18), pw, S(22));
             Theme.Fill(g, pill, pillBg, pill.Height / 2f);
@@ -150,9 +153,9 @@ namespace Minibar
             {
                 var ir2 = new Rectangle(pill.Right + S(6), pill.Y - S(1), S(24), S(24));
                 bool open = InfoOpen(a), ih = Hov(a, "info");
-                if (open || ih) Theme.Fill(g, ir2, open ? Color.FromArgb(40, Theme.Accent) : Color.FromArgb(58, 58, 58), ir2.Height / 2f);
+                if (open || ih) Theme.Fill(g, ir2, open ? Color.FromArgb(40, Theme.Accent) : Theme.Hover, ir2.Height / 2f);
                 // drawn by hand (a font glyph sits off-centre): ring, dot, stem
-                Color ic = open ? Theme.Accent : ih ? Theme.Text : Theme.Sub;
+                Color ic = open ? Theme.AccentText : ih ? Theme.Text : Theme.Sub;
                 float cxi = ir2.X + ir2.Width / 2f, cyi = ir2.Y + ir2.Height / 2f, rr = S(7.5f);
                 using (var pen = new Pen(ic, Math.Max(1f, s * 1.3f))) g.DrawEllipse(pen, cxi - rr, cyi - rr, rr * 2, rr * 2);
                 Theme.Disc(g, new PointF(cxi, cyi - rr * 0.45f), Math.Max(0.9f, s * 1.05f), ic);
@@ -173,7 +176,7 @@ namespace Minibar
                 int uw = TextW(g, a.Queued ? "Updates after downloads finish" : ut, fPillSemi) + S(36);   // same width while hovered, so it never flickers
                 var ur = new Rectangle(r.Right - S(18) - vw - S(12) - uw, top + S(16), uw, S(26));
                 bool uh = Hov(a, "update");
-                Color ink = a.Queued ? Theme.Accent : Color.FromArgb(22, 22, 22);
+                Color ink = a.Queued ? Theme.AccentText : Theme.Ink;
                 Theme.Fill(g, ur, a.Queued ? Color.FromArgb(uh ? 60 : 34, Theme.Accent) : uh ? Theme.AccentHover : Theme.Accent, ur.Height / 2f);
                 TextRenderer.DrawText(g, a.Queued ? "\uE823" : "\uE896", fPillIcon, new Rectangle(ur.X + S(10), ur.Y, S(14), ur.Height), ink, Ux.C);   // Recent / Download
                 TextRenderer.DrawText(g, ut, fPillSemi, new Rectangle(ur.X + S(28), ur.Y, uw - S(32), ur.Height), ink, Ux.L);
@@ -185,7 +188,7 @@ namespace Minibar
             if (a.Error != null && DateTime.Now < a.ErrorUntil)
                 TextRenderer.DrawText(g, a.Error, fSmall, l2, Theme.Red, Ux.L);
             else if (a.Note != null && DateTime.Now < a.NoteUntil)
-                TextRenderer.DrawText(g, a.Note, fSmall, l2, Theme.Accent, Ux.L);
+                TextRenderer.DrawText(g, a.Note, fSmall, l2, Theme.AccentText, Ux.L);
             else
             {
                 // what the app is, then what it's best at (the exe's place is one click away under Folder)
@@ -247,13 +250,13 @@ namespace Minibar
                 if (on) Theme.Fill(g, sw, can ? (th ? Theme.AccentHover : Theme.Accent) : Theme.Dim, sw.Height / 2);
                 else
                 {
-                    if (th) Theme.Fill(g, sw, Color.FromArgb(58, 58, 58), sw.Height / 2);
+                    if (th) Theme.Fill(g, sw, Theme.Hover, sw.Height / 2);
                     Theme.Stroke(g, sw, can ? (th ? Theme.Text : Theme.Sub) : Theme.Dim, sw.Height / 2, Math.Max(1, s));
                 }
                 float d = on ? S(12) : S(10);
                 float kx = on ? sw.Right - S(4) - d : sw.X + S(5);
                 if (th) d += S(1);
-                Theme.Disc(g, new PointF(kx + d / 2, sw.Y + sw.Height / 2), d / 2, on ? Color.FromArgb(24, 24, 24) : can ? Theme.Sub : Theme.Dim);
+                Theme.Disc(g, new PointF(kx + d / 2, sw.Y + sw.Height / 2), d / 2, on ? Theme.Ink : can ? Theme.Sub : Theme.Dim);
                 TextRenderer.DrawText(g, tl, fBody, new Rectangle(bx + S(50), by, tw - S(50), S(32)), can ? Theme.Text : Theme.Dim, Ux.L);
                 if (can) Hit(tr, "startup", a);
 
@@ -288,8 +291,8 @@ namespace Minibar
             {
                 int ih2 = InfoH(g, a, r.Width - S(36));
                 var nr = new Rectangle(r.X + S(18), top + S(Base) + FizzExtra(g, a, r.Width), r.Width - S(36), ih2);
-                Theme.Fill(g, nr, Color.FromArgb(36, 36, 36), S(10));
-                Theme.Stroke(g, new RectangleF(nr.X + 0.5f, nr.Y + 0.5f, nr.Width - 1, nr.Height - 1), Color.FromArgb(60, 60, 60), S(10), Math.Max(1, s));
+                Theme.Fill(g, nr, Theme.Note, S(10));
+                Theme.Stroke(g, new RectangleF(nr.X + 0.5f, nr.Y + 0.5f, nr.Width - 1, nr.Height - 1), Theme.NoteEdge, S(10), Math.Max(1, s));
                 TextRenderer.DrawText(g, a.Def.InfoTitle ?? "Good to know", fH, new Rectangle(nr.X + S(16), nr.Y + S(14), nr.Width - S(32), S(22)), Theme.Text, Ux.L);
                 TextRenderer.DrawText(g, a.Def.Info, fSmall, new Rectangle(nr.X + S(16), nr.Y + S(40), InfoTextW(nr.Width), ih2 - S(40)), Theme.Sub,
                     TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
@@ -303,7 +306,7 @@ namespace Minibar
                 Theme.Fill(g, nr, Color.FromArgb(24, Theme.Accent), S(10));
                 Theme.Stroke(g, new RectangleF(nr.X + 0.5f, nr.Y + 0.5f, nr.Width - 1, nr.Height - 1), Color.FromArgb(60, Theme.Accent), S(10), Math.Max(1, s));
                 bool warn = a.PawnIO == false;
-                TextRenderer.DrawText(g, warn ? Theme.GWarn : Theme.GInfo, fNoticeIcon, new Rectangle(nr.X + S(14), nr.Y + S(14), S(22), S(22)), Theme.Accent, Ux.C);
+                TextRenderer.DrawText(g, warn ? Theme.GWarn : Theme.GInfo, fNoticeIcon, new Rectangle(nr.X + S(14), nr.Y + S(14), S(22), S(22)), Theme.AccentText, Ux.C);
                 int tx = nr.X + S(48), tw2 = NoticeTextW(nr.Width);
                 TextRenderer.DrawText(g, NoticeTitle(a), fH, new Rectangle(tx, nr.Y + S(14), tw2, S(22)), Theme.Text, Ux.L);
                 TextRenderer.DrawText(g, NoticeText(a), fSmall, new Rectangle(tx, nr.Y + S(38), tw2, nh - S(38)), Theme.Sub,
@@ -330,10 +333,10 @@ namespace Minibar
             int w = Math.Max(S(92), TextW(g, text, fBtn) + gw + S(34));
             var r = new Rectangle(x, y, w, h);
             bool hv = !disabled && Hov(a, id);
-            Color bg = disabled ? Color.FromArgb(50, 50, 50) : primary ? (hv ? Theme.AccentHover : Theme.Accent) : (hv ? Color.FromArgb(66, 66, 66) : Color.FromArgb(56, 56, 56));
-            Color fg = disabled ? Theme.Sub : primary ? Color.FromArgb(22, 22, 22) : Theme.Text;
+            Color bg = disabled ? Theme.BtnOff : primary ? (hv ? Theme.AccentHover : Theme.Accent) : (hv ? Theme.BtnHover : Theme.Btn);
+            Color fg = disabled ? Theme.Sub : primary ? Theme.Ink : Theme.Text;
             Theme.Fill(g, r, bg, S(7));
-            if (!primary && !disabled) Theme.Stroke(g, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), Color.FromArgb(70, 70, 70), S(7), Math.Max(1, s));
+            if (!primary && !disabled) Theme.Stroke(g, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), Theme.BtnEdge, S(7), Math.Max(1, s));
             int tw = TextW(g, text, fBtn);
             int sx = r.X + (r.Width - tw - gw) / 2;
             if (glyph != null) TextRenderer.DrawText(g, glyph, fBtnIcon, new Rectangle(sx, r.Y, S(14), r.Height), fg, Ux.C);
@@ -350,7 +353,7 @@ namespace Minibar
             int w = LinkChipW(g, text);
             var r = new Rectangle(x, y, w, S(30));
             bool hv = Hov(a, id);
-            Theme.Fill(g, r, hv ? Color.FromArgb(70, 70, 70) : Color.FromArgb(54, 54, 54), S(7));
+            Theme.Fill(g, r, hv ? Theme.ChipHover : Theme.Chip, S(7));
             Color c = hv ? Theme.Text : Theme.Sub;
             TextRenderer.DrawText(g, text, fChip, new Rectangle(r.X + S(12), r.Y, w - S(34), r.Height), c, Ux.L);
             TextRenderer.DrawText(g, "\uE8A7", fChipIcon, new Rectangle(r.Right - S(26), r.Y, S(16), r.Height), c, Ux.C);
@@ -365,7 +368,7 @@ namespace Minibar
             int w = ChipW(g, text);
             var r = new Rectangle(x, y, w, S(32));
             bool hv = Hov(a, id);
-            if (hv) Theme.Fill(g, r, Color.FromArgb(58, 58, 58), S(7));
+            if (hv) Theme.Fill(g, r, Theme.Hover, S(7));
             Color c = hv ? Theme.Text : Theme.Sub;
             TextRenderer.DrawText(g, glyph, fChipIcon, new Rectangle(r.X + S(10), r.Y, S(16), r.Height), c, Ux.C);
             TextRenderer.DrawText(g, text, fChip, new Rectangle(r.X + S(30), r.Y, w - S(34), r.Height), c, Ux.L);

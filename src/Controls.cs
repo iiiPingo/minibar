@@ -12,7 +12,22 @@ namespace Minibar
     {
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr h, string app, string idList);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, string l);
-        public static void Dark(Control c) => c.HandleCreated += (o, e) => { try { SetWindowTheme(c.Handle, "DarkMode_Explorer", null); } catch { } };
+        // native scroll bars that follow the theme (dark ones on Dark / OLED, normal ones on Light)
+        static readonly List<WeakReference> themed = new List<WeakReference>();
+        public static void Dark(Control c)
+        {
+            themed.Add(new WeakReference(c));
+            c.HandleCreated += (o, e) => ApplyScrollTheme(c);
+        }
+        static void ApplyScrollTheme(Control c)
+        {
+            try { if (c.IsHandleCreated) SetWindowTheme(c.Handle, Theme.IsLight ? "Explorer" : "DarkMode_Explorer", null); } catch { }
+        }
+        public static void Retheme()
+        {
+            themed.RemoveAll(w => !(w.Target is Control));
+            foreach (var w in themed) if (w.Target is Control c) { ApplyScrollTheme(c); c.Invalidate(true); }
+        }
         public static void Cue(TextBox b, string text) { try { if (b.IsHandleCreated) SendMessage(b.Handle, 0x1501, (IntPtr)1, text); } catch { } }
         public const TextFormatFlags L = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
         public const TextFormatFlags R = TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
@@ -93,7 +108,7 @@ namespace Minibar
             else Theme.Stroke(g, pill, Focused ? Theme.Text : Enabled ? Theme.Sub : Theme.Dim, pill.Height / 2, Math.Max(1, s));
             float d = on ? S(14) : S(12);
             float kx = on ? pill.Right - S(3) - d : pill.X + S(4);
-            using (var b = new SolidBrush(on ? Color.FromArgb(24, 24, 24) : Enabled ? Theme.Sub : Theme.Dim))
+            using (var b = new SolidBrush(on ? Theme.Ink : Enabled ? Theme.Sub : Theme.Dim))
                 g.FillEllipse(b, kx, pill.Y + (pill.Height - d) / 2, d, d);
             var tr = new Rectangle(S(52), (int)pill.Y - S(2), Width - S(52), S(24));
             TextRenderer.DrawText(g, Text, Font, tr, Enabled ? ForeColor : Theme.Dim, Ux.L);
@@ -133,11 +148,70 @@ namespace Minibar
             var r = new Rectangle(0, 0, Width - 1, Height - 1);
             Color bg, fg;
             if (!Enabled) { bg = Theme.CardSoft; fg = Theme.Dim; }
-            else if (Primary) { bg = hover ? Theme.AccentHover : Theme.Accent; fg = Color.FromArgb(20, 20, 20); }
-            else { bg = down ? Theme.CardHover : hover ? Color.FromArgb(52, 52, 52) : Theme.Card; fg = Theme.Text; }
+            else if (Primary) { bg = hover ? Theme.AccentHover : Theme.Accent; fg = Theme.Ink; }
+            else { bg = down ? Theme.CardHover : hover ? Theme.CardHi : Theme.Card; fg = Theme.Text; }
             Theme.Fill(g, r, bg, S(6));
+            if (!Primary && Theme.Hairline != Color.Empty) Theme.Stroke(g, r, Theme.Hairline, S(6), Math.Max(1, s));
             if (Focused && !Primary && Enabled) Theme.Stroke(g, r, Theme.Sub, S(6), Math.Max(1, s));
             TextRenderer.DrawText(g, Text, Font, r, fg, Ux.C);
+        }
+    }
+
+    // Dark | OLED | Light: a segmented picker (one rounded track, the chosen part raised)
+    class Segmented : MbControl
+    {
+        public readonly string[] Items;
+        int index, hover = -1;
+        public event Action<int> Picked;
+        public Segmented(float scale, params string[] items) : base(scale)
+        {
+            Items = items;
+            Font = Theme.Ui(10f);
+            Cursor = Cursors.Hand;
+            SetStyle(ControlStyles.Selectable, true);
+            Size = new Size(S(96) * items.Length + S(8), S(36));
+        }
+        public int Index { get => index; set { value = Math.Max(0, Math.Min(Items.Length - 1, value)); if (index != value) { index = value; Invalidate(); } } }
+        Rectangle Cell(int i)
+        {
+            int w = (Width - S(8)) / Items.Length;
+            return new Rectangle(S(4) + i * w, S(4), w, Height - S(8));
+        }
+        int Hit(Point p) { for (int i = 0; i < Items.Length; i++) if (Cell(i).Contains(p)) return i; return -1; }
+        void Pick(int i) { if (i < 0 || i >= Items.Length) return; bool changed = i != index; Index = i; if (changed) Picked?.Invoke(i); }
+        protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); int h = Hit(e.Location); if (h != hover) { hover = h; Invalidate(); } }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hover = -1; Invalidate(); }
+        protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); Focus(); if (e.Button == MouseButtons.Left) Pick(Hit(e.Location)); }
+        protected override bool IsInputKey(Keys k) => k == Keys.Left || k == Keys.Right || base.IsInputKey(k);
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode == Keys.Left) { Pick(index - 1); e.Handled = true; }
+            else if (e.KeyCode == Keys.Right) { Pick(index + 1); e.Handled = true; }
+        }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(BackColor);
+            var track = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
+            Theme.Fill(g, track, Theme.CardSoft, S(8));
+            Theme.Stroke(g, track, Focused ? Theme.Sub : Theme.Border, S(8), Math.Max(1, s));
+            for (int i = 0; i < Items.Length; i++)
+            {
+                var c = Cell(i);
+                bool sel = i == index;
+                if (sel)
+                {
+                    Theme.Fill(g, c, Theme.Card, S(6));
+                    if (Theme.Hairline != Color.Empty) Theme.Stroke(g, new RectangleF(c.X + 0.5f, c.Y + 0.5f, c.Width - 1, c.Height - 1), Theme.Hairline, S(6), Math.Max(1, s));
+                    Theme.Fill(g, new RectangleF(c.X + c.Width / 2f - S(8), c.Bottom - S(4), S(16), S(2.5f)), Theme.Accent, S(1.25f));
+                }
+                else if (i == hover) Theme.Fill(g, c, Theme.CardHi, S(6));
+                TextRenderer.DrawText(g, Items[i], Font, c, sel ? Theme.Text : i == hover ? Theme.Text : Theme.Sub, Ux.C);
+            }
         }
     }
 

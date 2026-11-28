@@ -7,24 +7,119 @@ namespace Minibar
 {
     static class Theme
     {
-        public static readonly Color Bg = Color.FromArgb(32, 32, 32);
-        public static readonly Color Card = Color.FromArgb(45, 45, 45);
-        public static readonly Color CardSoft = Color.FromArgb(39, 39, 39);
-        public static readonly Color CardHover = Color.FromArgb(58, 58, 58);
-        public static readonly Color Field = Color.FromArgb(52, 52, 52);
-        public static readonly Color Border = Color.FromArgb(62, 62, 62);
-        public static readonly Color Text = Color.FromArgb(242, 242, 242);
-        public static readonly Color Sub = Color.FromArgb(170, 170, 170);
-        public static readonly Color Dim = Color.FromArgb(120, 120, 120);
-        public static readonly Color Track = Color.FromArgb(88, 88, 88);
-        public static readonly Color Nav = Color.FromArgb(27, 27, 27);
-        public static readonly Color Red = Color.FromArgb(240, 96, 96);
+        // ---------------------------------------------------------------- palettes: Dark (default), OLED, Light (theme= in settings.ini)
+        public static Palette P { get; private set; } = Palette.Dark;
+        public static ThemeMode Mode => P.Mode;
+        public static bool IsLight => P.Mode == ThemeMode.Light;
+
+        public static Color Bg => P.Bg;               // page canvas
+        public static Color Nav => P.Nav;             // left side menu
+        public static Color Card => P.Card;           // buttons, active nav pill
+        public static Color CardSoft => P.CardSoft;   // disabled button
+        public static Color CardHi => P.CardHi;       // button hover
+        public static Color CardHover => P.CardHover; // button pressed
+        public static Color Field => P.Field;         // inputs, icon tiles
+        public static Color Border => P.Border;
+        public static Color Hairline => P.Hairline;   // 1px edge round buttons (OLED, Light); empty = none (Dark)
+        public static Color Text => P.Text;
+        public static Color Sub => P.Sub;
+        public static Color Dim => P.Dim;
+        public static Color Track => P.Track;         // slider track
+        public static Color Red => P.Red;
+        public static Color Tile => P.Tile;           // the big cards in the lists
+        public static Color TileHover => P.TileHover;
+        public static Color TileEdge => P.TileEdge;
+        public static Color TileEdgeHover => P.TileEdgeHover;
+        public static Color Divider => P.Divider;
+        public static Color FocusEdge => P.FocusEdge;
+        public static Color Pill => P.Pill;           // grey status pill
+        public static Color Hover => P.Hover;         // ghost chip / switch hover
+        public static Color Btn => P.Btn;             // secondary button on a card
+        public static Color BtnHover => P.BtnHover;
+        public static Color BtnEdge => P.BtnEdge;
+        public static Color BtnOff => P.BtnOff;
+        public static Color Chip => P.Chip;           // filled link chip
+        public static Color ChipHover => P.ChipHover;
+        public static Color ChipEdge => P.ChipEdge;   // ghost chip outline
+        public static Color Note => P.Note;           // the (i) note box
+        public static Color NoteEdge => P.NoteEdge;
+        public static Color SideCard => P.SideCard;   // update card in the side menu
+        public static Color SideEdge => P.SideEdge;
+        public static Color SideLine => P.SideLine;
+        public static Color NavHover => P.NavHover;
+        public static Color Bar => P.Bar;             // battery bar track
+        public static Color Knob => P.Knob;           // ring round the brightness knob
+        public static Color Shadow => P.Shadow;
+        public static Color MenuBack => P.MenuBack;
+        public static Color MenuHi => P.MenuHi;
+        public static Color MenuSep => P.MenuSep;
+        // text drawn on an accent fill: always dark, every accent is bright
+        public static readonly Color Ink = Color.FromArgb(22, 22, 22);
 
         // accent colour: honey by default, changeable in Settings
         public static readonly Color DefaultAccent = Color.FromArgb(242, 193, 78);   // #F2C14E
         public static Color Accent { get; private set; } = DefaultAccent;
         public static Color AccentHover { get; private set; } = Mix(DefaultAccent, Color.White, 0.22f);
         public static Color AccentSoft { get; private set; } = Color.FromArgb(40, DefaultAccent);
+        // accent used as text or a thin glyph: darker on Light so it stays readable on white
+        public static Color AccentText => IsLight ? Mix(Accent, Color.Black, 0.45f) : Accent;
+
+        public static ThemeMode ParseMode(string s)
+        {
+            switch ((s ?? "").Trim().ToLowerInvariant())
+            {
+                case "oled": return ThemeMode.Oled;
+                case "light": return ThemeMode.Light;
+                default: return ThemeMode.Dark;
+            }
+        }
+
+        public static string ModeName(ThemeMode m) => m == ThemeMode.Oled ? "oled" : m == ThemeMode.Light ? "light" : "dark";
+
+        public static void SetMode(ThemeMode m) => P = Palette.For(m);
+
+        // a control's colour under the old palette -> the same role under the current one (for live switching)
+        public static Color Remap(Color c, Palette from, Color accentTextBefore)
+        {
+            if (c.IsEmpty || c.A < 255) return c;
+            int v = c.ToArgb();
+            if (v == from.Bg.ToArgb()) return Bg;
+            if (v == from.Nav.ToArgb()) return Nav;
+            if (v == from.Text.ToArgb()) return Text;
+            if (v == from.Sub.ToArgb()) return Sub;
+            if (v == from.Dim.ToArgb()) return Dim;
+            if (v == from.Field.ToArgb()) return Field;
+            if (v == from.Red.ToArgb()) return Red;
+            if (v == accentTextBefore.ToArgb()) return AccentText;
+            return c;
+        }
+
+        // Windows 11 title bar: dark or light caption buttons, caption and border colours
+        public static void ApplyTitleBar(IntPtr h, Color? darkCaption = null)
+        {
+            if (h == IntPtr.Zero) return;
+            try
+            {
+                int dark = IsLight ? 0 : 1;
+                Dwm(h, 20, ref dark, 4);              // DWMWA_USE_IMMERSIVE_DARK_MODE
+                int cap, border;
+                switch (Mode)
+                {
+                    case ThemeMode.Oled: cap = 0x000000; border = 0x000000; break;
+                    case ThemeMode.Light: cap = 0x00F3F3F3; border = 0x00E0E0E0; break;
+                    default: cap = ColorRef(darkCaption ?? Nav); border = unchecked((int)0xFFFFFFFF); break;   // Dark: as before, system border
+                }
+                Dwm(h, 35, ref cap, 4);               // DWMWA_CAPTION_COLOR
+                Dwm(h, 34, ref border, 4);            // DWMWA_BORDER_COLOR
+                int text = IsLight ? 0x001B1B1B : unchecked((int)0xFFFFFFFF);  // DWMWA_TEXT_COLOR: dark on Light, default otherwise
+                Dwm(h, 36, ref text, 4);
+            }
+            catch { }
+        }
+
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")] static extern int Dwm(IntPtr h, int attr, ref int value, int size);
+
+        public static int ColorRef(Color c) => c.R | (c.G << 8) | (c.B << 16);
 
         // the family colours (the same swatches every app offers)
         public static readonly Color[] Presets =
@@ -162,6 +257,63 @@ namespace Minibar
         }
     }
 
+    enum ThemeMode { Dark, Oled, Light }
+
+    // every colour the UI draws with, per theme. Dark is the original look, value for value.
+    sealed class Palette
+    {
+        public ThemeMode Mode;
+        public Color Bg, Nav, Card, CardSoft, CardHi, CardHover, Field, Border, Hairline, Text, Sub, Dim, Track, Red,
+            Tile, TileHover, TileEdge, TileEdgeHover, Divider, FocusEdge, Pill, Hover, Btn, BtnHover, BtnEdge, BtnOff,
+            Chip, ChipHover, ChipEdge, Note, NoteEdge, SideCard, SideEdge, SideLine, NavHover, Bar, Knob, Shadow,
+            MenuBack, MenuHi, MenuSep;
+
+        static Color G(int v) => Color.FromArgb(v, v, v);
+        static Color H(int rgb) => Color.FromArgb(255, (rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+
+        public static readonly Palette Dark = new Palette
+        {
+            Mode = ThemeMode.Dark,
+            Bg = G(32), Nav = G(27), Card = G(45), CardSoft = G(39), CardHi = G(52), CardHover = G(58), Field = G(52), Border = G(62),
+            Hairline = Color.Empty, Text = G(242), Sub = G(170), Dim = G(120), Track = G(88), Red = Color.FromArgb(240, 96, 96),
+            Tile = G(43), TileHover = G(47), TileEdge = G(56), TileEdgeHover = G(66), Divider = G(54), FocusEdge = G(78),
+            Pill = G(52), Hover = G(58), Btn = G(56), BtnHover = G(66), BtnEdge = G(70), BtnOff = G(50),
+            Chip = G(54), ChipHover = G(70), ChipEdge = G(64), Note = G(36), NoteEdge = G(60),
+            SideCard = G(34), SideEdge = G(50), SideLine = G(48), NavHover = G(36), Bar = G(58), Knob = G(69),
+            Shadow = Color.FromArgb(18, 0, 0, 0), MenuBack = G(40), MenuHi = G(60), MenuSep = G(64),
+        };
+
+        // Discord Onyx style: pure black canvas, near-black raised surfaces, #1F1F24 hairlines
+        public static readonly Palette Oled = new Palette
+        {
+            Mode = ThemeMode.Oled,
+            Bg = H(0x000000), Nav = H(0x000000), Card = H(0x131316), CardSoft = H(0x0D0D10), CardHi = H(0x1A1A1E), CardHover = H(0x202026),
+            Field = H(0x131316), Border = H(0x1F1F24), Hairline = H(0x1F1F24), Text = G(242), Sub = G(170), Dim = G(120), Track = H(0x2A2A30),
+            Red = Color.FromArgb(240, 96, 96),
+            Tile = H(0x0D0D10), TileHover = H(0x111114), TileEdge = H(0x1F1F24), TileEdgeHover = H(0x2C2C33), Divider = H(0x1F1F24), FocusEdge = H(0x3A3A42),
+            Pill = H(0x131316), Hover = H(0x1A1A1E), Btn = H(0x131316), BtnHover = H(0x1C1C21), BtnEdge = H(0x1F1F24), BtnOff = H(0x0D0D10),
+            Chip = H(0x131316), ChipHover = H(0x202026), ChipEdge = H(0x1F1F24), Note = H(0x131316), NoteEdge = H(0x1F1F24),
+            SideCard = H(0x0D0D10), SideEdge = H(0x1F1F24), SideLine = H(0x1F1F24), NavHover = H(0x0D0D10), Bar = H(0x1F1F24), Knob = H(0x2A2A30),
+            Shadow = Color.FromArgb(0, 0, 0, 0), MenuBack = H(0x0D0D10), MenuHi = H(0x1C1C21), MenuSep = H(0x1F1F24),
+        };
+
+        // Windows 11 Fluent light: #F3F3F3 canvas, white raised surfaces, #E0E0E0 hairlines, #1B1B1B / #5C5C5C text
+        public static readonly Palette Light = new Palette
+        {
+            Mode = ThemeMode.Light,
+            Bg = H(0xF3F3F3), Nav = H(0xF3F3F3), Card = H(0xFFFFFF), CardSoft = H(0xF9F9F9), CardHi = H(0xF9F9F9), CardHover = H(0xF0F0F0),
+            Field = H(0xFFFFFF), Border = H(0xE0E0E0), Hairline = H(0xE0E0E0), Text = H(0x1B1B1B), Sub = H(0x5C5C5C), Dim = H(0x767676), Track = H(0xC8C8C8),
+            Red = H(0xC42B1C),
+            Tile = H(0xFFFFFF), TileHover = H(0xF9F9F9), TileEdge = H(0xE0E0E0), TileEdgeHover = H(0xD0D0D0), Divider = H(0xEBEBEB), FocusEdge = H(0xA0A0A0),
+            Pill = H(0xF0F0F0), Hover = H(0xF0F0F0), Btn = H(0xF9F9F9), BtnHover = H(0xF0F0F0), BtnEdge = H(0xE0E0E0), BtnOff = H(0xF3F3F3),
+            Chip = H(0xF3F3F3), ChipHover = H(0xEAEAEA), ChipEdge = H(0xE0E0E0), Note = H(0xF9F9F9), NoteEdge = H(0xE0E0E0),
+            SideCard = H(0xFFFFFF), SideEdge = H(0xE0E0E0), SideLine = H(0xE0E0E0), NavHover = H(0xEAEAEA), Bar = H(0xE0E0E0), Knob = H(0xFFFFFF),
+            Shadow = Color.FromArgb(12, 0, 0, 0), MenuBack = H(0xFFFFFF), MenuHi = H(0xF0F0F0), MenuSep = H(0xE0E0E0),
+        };
+
+        public static Palette For(ThemeMode m) => m == ThemeMode.Oled ? Oled : m == ThemeMode.Light ? Light : Dark;
+    }
+
     // ---------------------------------------------------------------- Lexend, built into the exe (nothing installed on the PC)
     // Like Fizz's AppFonts: one PrivateFontCollection per file (GDI+ Font objects) plus AddFontMemResourceEx
     // (so TextRenderer / GDI finds the same faces). The memory stays allocated for the life of the process.
@@ -231,7 +383,8 @@ namespace Minibar
     // ---------------------------------------------------------------- dark menu
     class DarkColors : ProfessionalColorTable
     {
-        static readonly Color Back = Color.FromArgb(40, 40, 40), Hi = Color.FromArgb(60, 60, 60);
+        static Color Back => Theme.MenuBack;
+        static Color Hi => Theme.MenuHi;
         public override Color ToolStripDropDownBackground => Back;
         public override Color ImageMarginGradientBegin => Back;
         public override Color ImageMarginGradientMiddle => Back;
@@ -243,7 +396,7 @@ namespace Minibar
         public override Color MenuItemSelectedGradientEnd => Hi;
         public override Color MenuItemPressedGradientBegin => Hi;
         public override Color MenuItemPressedGradientEnd => Hi;
-        public override Color SeparatorDark => Color.FromArgb(64, 64, 64);
+        public override Color SeparatorDark => Theme.MenuSep;
         public override Color SeparatorLight => Back;
     }
 

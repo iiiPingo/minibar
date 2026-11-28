@@ -41,6 +41,7 @@ static class SideTest
                 V200();
                 Displays();
                 Window();
+                Themes();
                 Console.WriteLine();
                 Console.WriteLine(fail == 0 ? "ALL " + pass + " PASSED" : fail + " FAILED, " + pass + " passed");
                 code = fail == 0 ? 0 : 1;
@@ -470,6 +471,123 @@ static class SideTest
         finally { w.Dispose(); SideMenu.RunningHook = null; SideMenu.RefillPathHook = null; }
     }
 
+    // ---------------------------------------------------------------- 2.2.0: Dark / OLED / Light
+    static double Lum(Color c)
+    {
+        double L(int v) { double x = v / 255.0; return x <= 0.03928 ? x / 12.92 : Math.Pow((x + 0.055) / 1.055, 2.4); }
+        return 0.2126 * L(c.R) + 0.7152 * L(c.G) + 0.0722 * L(c.B);
+    }
+    static double Contrast(Color a, Color b) { double x = Lum(a), y = Lum(b); return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05); }
+    static bool Near(Color a, Color b, int tol = 3) => Math.Abs(a.R - b.R) <= tol && Math.Abs(a.G - b.G) <= tol && Math.Abs(a.B - b.B) <= tol;
+
+    static void Themes()
+    {
+        Console.WriteLine("Themes");
+        Ok(Theme.ParseMode("oled") == ThemeMode.Oled && Theme.ParseMode(" Light ") == ThemeMode.Light && Theme.ParseMode("dark") == ThemeMode.Dark
+           && Theme.ParseMode("") == ThemeMode.Dark && Theme.ParseMode("purple") == ThemeMode.Dark && Theme.ParseMode(null) == ThemeMode.Dark, "theme= parsing, anything unknown is dark");
+        Ok(Theme.ModeName(ThemeMode.Dark) == "dark" && Theme.ModeName(ThemeMode.Oled) == "oled" && Theme.ModeName(ThemeMode.Light) == "light", "theme names");
+
+        // settings.ini round trip
+        string keep = File.ReadAllText(Settings.FilePath);
+        try
+        {
+            File.WriteAllText(Settings.FilePath, "checkupdates=0\r\nstartmenu=0\r\n");
+            Ok(Settings.Load().Theme == "dark", "no theme= line: dark (the default)");
+            var s1 = Settings.Load(); s1.Theme = "oled"; s1.Save();
+            Ok(File.ReadAllText(Settings.FilePath).Contains("theme=oled") && Settings.Load().Theme == "oled", "theme=oled saved and read back");
+            File.WriteAllText(Settings.FilePath, "theme=LIGHT\r\n");
+            Ok(Settings.Load().Theme == "light", "theme=LIGHT reads as light");
+            File.WriteAllText(Settings.FilePath, "theme=neon\r\n");
+            Ok(Settings.Load().Theme == "dark", "a typo in theme= falls back to dark");
+            var a = new Settings(); var b = new Settings { Theme = "light" }; a.CopyFrom(b);
+            Ok(a.Theme == "light", "restore takes the theme over");
+        }
+        finally { File.WriteAllText(Settings.FilePath, keep); }
+
+        // Dark is the old look, value for value
+        var d = Palette.Dark;
+        Ok(d.Bg.ToArgb() == Color.FromArgb(32, 32, 32).ToArgb() && d.Nav.ToArgb() == Color.FromArgb(27, 27, 27).ToArgb() && d.Card.ToArgb() == Color.FromArgb(45, 45, 45).ToArgb()
+           && d.Text.ToArgb() == Color.FromArgb(242, 242, 242).ToArgb() && d.Sub.ToArgb() == Color.FromArgb(170, 170, 170).ToArgb() && d.Tile.ToArgb() == Color.FromArgb(43, 43, 43).ToArgb()
+           && d.Hairline.IsEmpty, "Dark keeps the original colours (no new borders)");
+        var o = Palette.Oled;
+        Ok(o.Bg.ToArgb() == Color.Black.ToArgb() && o.Nav.ToArgb() == Color.Black.ToArgb(), "OLED: pure black canvas and side menu");
+        bool raised = new[] { o.Card, o.CardSoft, o.Tile, o.Field, o.Btn, o.Pill, o.SideCard }.All(c => c.R >= 0x0D && c.R <= 0x13 && c.B <= 0x16);
+        Ok(raised && o.Hairline.ToArgb() == Color.FromArgb(0x1F, 0x1F, 0x24).ToArgb() && o.TileEdge.ToArgb() == o.Hairline.ToArgb(), "OLED: #0D0D10-#131316 surfaces, #1F1F24 hairlines");
+        Ok(o.Text.ToArgb() == d.Text.ToArgb() && o.Sub.ToArgb() == d.Sub.ToArgb(), "OLED: text colours unchanged");
+        var l = Palette.Light;
+        Ok(l.Bg.ToArgb() == Color.FromArgb(0xF3, 0xF3, 0xF3).ToArgb() && l.Nav.ToArgb() == l.Bg.ToArgb() && l.Tile.ToArgb() == Color.White.ToArgb() && l.Field.ToArgb() == Color.White.ToArgb()
+           && l.Border.ToArgb() == Color.FromArgb(0xE0, 0xE0, 0xE0).ToArgb() && l.Text.ToArgb() == Color.FromArgb(0x1B, 0x1B, 0x1B).ToArgb() && l.Sub.ToArgb() == Color.FromArgb(0x5C, 0x5C, 0x5C).ToArgb(),
+           "Light: #F3F3F3 canvas, white cards, #E0E0E0 borders, #1B1B1B / #5C5C5C text");
+        foreach (var p in new[] { d, o, l })
+        {
+            string n = p.Mode.ToString();
+            Ok(Contrast(p.Text, p.Bg) >= 7 && Contrast(p.Text, p.Tile) >= 7, n + ": main text contrast >= 7:1");
+            Ok(Contrast(p.Sub, p.Tile) >= 4.5 && Contrast(p.Sub, p.Bg) >= 4.5, n + ": secondary text >= 4.5:1");
+            Ok(Contrast(p.Dim, p.Tile) >= 3.0, n + ": hint text >= 3:1", Contrast(p.Dim, p.Tile).ToString("0.0"));
+            Ok(Contrast(p.Red, p.Tile) >= 3.5, n + ": red error text readable", Contrast(p.Red, p.Tile).ToString("0.0"));
+        }
+        // accent as text on Light: darkened enough for every family colour
+        var acc = Theme.Accent;
+        Theme.SetMode(ThemeMode.Light);
+        string weak = "";
+        foreach (var c in Theme.Presets) { Theme.SetAccent(c); double k = Contrast(Theme.AccentText, Color.White); if (k < 3) weak += Theme.Hex(c) + "=" + k.ToString("0.0") + " "; }
+        Ok(weak.Length == 0, "Light: accent text >= 3:1 on white for every preset", weak);
+        Theme.SetMode(ThemeMode.Dark); Theme.SetAccent(Theme.DefaultAccent);
+        Ok(Theme.AccentText.ToArgb() == Theme.Accent.ToArgb(), "Dark: accent text is the accent itself");
+        Theme.SetAccent(acc);
+
+        // the real window switches live
+        var rig = Make();
+        var w = rig.W;
+        long crashBefore = File.Exists(Log.Path) ? new FileInfo(Log.Path).Length : 0;
+        try
+        {
+            float s = Scale(w);
+            int S(float v) => (int)Math.Round(v * s);
+            Point navPt = new Point(S(172), S(6)), pagePt = new Point(w.ClientSize.Width - S(20), S(10));
+            Color dNav, dPage;
+            using (var bmp = Snap(w)) { dNav = bmp.GetPixel(navPt.X, navPt.Y); dPage = bmp.GetPixel(pagePt.X, pagePt.Y); }
+            Ok(Near(dNav, Palette.Dark.Nav) && Near(dPage, Palette.Dark.Bg), "starts Dark", dNav + " " + dPage);
+
+            var pick = All(w).OfType<Segmented>().FirstOrDefault();
+            Ok(pick != null && pick.Items.SequenceEqual(new[] { "Dark", "OLED", "Light" }) && pick.Index == 0, "Settings has the Dark / OLED / Light picker, on Dark");
+            typeof(Segmented).GetMethod("Pick", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(pick, new object[] { 2 });
+            Application.DoEvents();
+            Ok(Theme.Mode == ThemeMode.Light && File.ReadAllText(Settings.FilePath).Contains("theme=light"), "picking Light saves theme=light");
+            using (var bmp = Snap(w))
+                Ok(Near(bmp.GetPixel(navPt.X, navPt.Y), Palette.Light.Nav) && Near(bmp.GetPixel(pagePt.X, pagePt.Y), Palette.Light.Bg), "Light applies at once (side menu and page)");
+            var labels = All(w).OfType<Label>().ToList();
+            Ok(labels.All(x => x.BackColor.ToArgb() == Palette.Light.Bg.ToArgb()), "every label sits on the Light canvas");
+            Ok(labels.All(x => x.ForeColor.ToArgb() != Palette.Dark.Text.ToArgb() && x.ForeColor.ToArgb() != Palette.Dark.Sub.ToArgb() && x.ForeColor.ToArgb() != Palette.Dark.Dim.ToArgb()),
+               "no label kept a dark-theme text colour");
+            Ok(All(w).OfType<Control>().All(c => c.BackColor.ToArgb() != Palette.Dark.Bg.ToArgb() && c.BackColor.ToArgb() != Palette.Dark.Nav.ToArgb()), "no control kept a dark background");
+
+            typeof(Segmented).GetMethod("Pick", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(pick, new object[] { 1 });
+            Application.DoEvents();
+            using (var bmp = Snap(w))
+                Ok(bmp.GetPixel(navPt.X, navPt.Y).ToArgb() == Color.Black.ToArgb() && bmp.GetPixel(pagePt.X, pagePt.Y).ToArgb() == Color.Black.ToArgb(), "OLED: pure black on screen");
+            Ok(File.ReadAllText(Settings.FilePath).Contains("theme=oled"), "theme=oled saved");
+            var side = w.SideButtonsForTest.ToList();
+            Ok(side.All(b => b.BackColor.ToArgb() == Color.Black.ToArgb()), "side menu buttons follow the side menu");
+
+            typeof(Segmented).GetMethod("Pick", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(pick, new object[] { 0 });
+            Application.DoEvents();
+            using (var bmp = Snap(w))
+                Ok(Near(bmp.GetPixel(navPt.X, navPt.Y), dNav, 0) && Near(bmp.GetPixel(pagePt.X, pagePt.Y), dPage, 0), "back to Dark: exactly as before");
+            Ok(side.All(b => b.BackColor.ToArgb() == Palette.Dark.Nav.ToArgb()), "side buttons back on the dark side menu");
+            foreach (int pg in new[] { 0, 1, 2, 3 })
+                foreach (var m in new[] { ThemeMode.Light, ThemeMode.Oled, ThemeMode.Dark })
+                { w.ShowPageForTest(pg); w.ApplyTheme(m); Application.DoEvents(); using (Snap(w)) { } }
+            Ok(true, "every page draws in every theme");
+            long crashAfter = File.Exists(Log.Path) ? new FileInfo(Log.Path).Length : 0;
+            Ok(crashAfter == crashBefore, "theme switching wrote nothing to crash.log", crashAfter > crashBefore ? File.ReadAllText(Log.Path) : "");
+        }
+        catch (Exception ex) { Ok(false, "theme tests crashed", ex.ToString()); }
+        finally { w.ApplyTheme(ThemeMode.Dark); w.Dispose(); SideMenu.RunningHook = null; SideMenu.RefillPathHook = null; }
+    }
+
+    static IEnumerable<Control> All(Control c) { foreach (Control k in c.Controls) { yield return k; foreach (var x in All(k)) yield return x; } }
+
     // the client area as a picture (Form.DrawToBitmap draws the title bar too)
     static Bitmap Snap(MainWindow w)
     {
@@ -553,6 +671,14 @@ static class SideTest
         w.SetDisplaysForTest(FakeDisplays());
         Shot("7-displays", normalH, true);
         Shot("8-displays-smallest", minH, true);
+        // every page in every theme
+        foreach (var m in new[] { ThemeMode.Dark, ThemeMode.Oled, ThemeMode.Light })
+        {
+            w.ApplyTheme(m);
+            string[] names = { "apps", "updates", "displays", "settings" };
+            for (int pg = 0; pg < 4; pg++) { w.ShowPageForTest(pg); Shot("9-" + Theme.ModeName(m) + "-" + (pg + 1) + "-" + names[pg], normalH, true); }
+        }
+        w.ApplyTheme(ThemeMode.Dark);
         w.ShowPageForTest(0);
         w.Dispose();
         SideMenu.RunningHook = null; SideMenu.RefillPathHook = null;

@@ -37,6 +37,7 @@ namespace Minibar
                 {
                     var st = Settings.Load();
                     if (st.Accent.Length > 0 && Theme.TryHex(st.Accent, out var c)) Theme.SetAccent(c);
+                    Theme.SetMode(Theme.ParseMode(st.Theme));
                     w = new MainWindow(st);
                 }
                 catch (Exception ex)

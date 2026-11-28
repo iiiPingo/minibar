@@ -192,7 +192,7 @@ namespace Minibar
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            try { int dark = 1; Native.DwmSetWindowAttribute(Handle, 20, ref dark, 4); int cap = Theme.Bg.R | (Theme.Bg.G << 8) | (Theme.Bg.B << 16); Native.DwmSetWindowAttribute(Handle, 35, ref cap, 4); } catch { }
+            Theme.ApplyTitleBar(Handle, Theme.Bg);
         }
     }
 }

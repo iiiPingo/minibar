@@ -109,13 +109,7 @@ namespace Minibar
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            try
-            {
-                int dark = 1; Native.DwmSetWindowAttribute(Handle, 20, ref dark, 4);
-                int cap = Theme.Nav.R | (Theme.Nav.G << 8) | (Theme.Nav.B << 16);
-                Native.DwmSetWindowAttribute(Handle, 35, ref cap, 4);   // caption colour (Win11)
-            }
-            catch { }
+            Theme.ApplyTitleBar(Handle);   // dark / OLED / light caption (Win11)
         }
 
         protected override void WndProc(ref Message m)
@@ -341,6 +335,22 @@ namespace Minibar
             p.AutoScroll = true;
             Ux.Dark(p);
             int y = S(70), w = p.Width;
+            var thL = Lbl(p, "Theme", 0, y, S(120), S(36), Theme.Text, fBody);
+            thL.TextAlign = ContentAlignment.MiddleLeft;
+            thL.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            themePick = new Segmented(s, "Dark", "OLED", "Light") { Location = new Point(S(120), y), Anchor = AnchorStyles.Top | AnchorStyles.Left };
+            themePick.Index = (int)Theme.ParseMode(st.Theme);
+            themePick.Picked += i =>
+            {
+                var m = (ThemeMode)i;
+                st.Theme = Theme.ModeName(m);
+                st.Save();
+                ApplyTheme(m);
+            };
+            p.Controls.Add(themePick);
+            themePick.BringToFront();
+            y += S(52);
+
             var accL = Lbl(p, "Accent colour", 0, y, S(120), S(36), Theme.Text, fBody);
             accL.TextAlign = ContentAlignment.MiddleLeft;
             accL.Anchor = AnchorStyles.Top | AnchorStyles.Left;   // stretching with the window made it cover the swatches
@@ -719,7 +729,7 @@ namespace Minibar
                     string msg; bool ok = true;
                     try { int n = SettingsBackup.Create(BackupRows, path); msg = "Saved " + n + " apps' settings to " + Path.GetFileName(path); }
                     catch (Exception ex) { Log.Crash(ex); msg = "Couldn't save: " + ex.Message; ok = false; }
-                    Ui(() => { backupNote.ForeColor = ok ? Theme.Accent : Theme.Red; backupNote.Text = msg; });
+                    Ui(() => { backupNote.ForeColor = ok ? Theme.AccentText : Theme.Red; backupNote.Text = msg; });
                 });
             }
         }
@@ -766,9 +776,12 @@ namespace Minibar
                             var fresh = Settings.Load();
                             st.CopyFrom(fresh);
                             if (Theme.TryHex(st.Accent, out var col) && st.Accent.Length > 0) Theme.SetAccent(col); else Theme.SetAccent(Theme.DefaultAccent);
+                            var tm = Theme.ParseMode(st.Theme);
+                            if (themePick != null) themePick.Index = (int)tm;
+                            ApplyTheme(tm);
                             RefreshAll(this);
                         }
-                        backupNote.ForeColor = ok ? Theme.Accent : Theme.Red;
+                        backupNote.ForeColor = ok ? Theme.AccentText : Theme.Red;
                         backupNote.Text = msg;
                         LookAgain();
                     });
@@ -1062,17 +1075,17 @@ namespace Minibar
                         int pw = TextRenderer.MeasureText(g, pct, fSideHead, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width + S(2);
                         TextRenderer.DrawText(g, pct, fSideHead, new Rectangle(x + w - pw, y, pw, S(22)), d.Low ? Theme.Red : Theme.Sub, right | TextFormatFlags.NoPadding);
                         int bolt = d.Charging ? S(13) : 0;
-                        if (d.Charging) TextRenderer.DrawText(g, "\uE945", fSideBolt, new Rectangle(x + w - pw - bolt, y, bolt, S(22)), Theme.Accent, Ux.C);   // lightning bolt
+                        if (d.Charging) TextRenderer.DrawText(g, "\uE945", fSideBolt, new Rectangle(x + w - pw - bolt, y, bolt, S(22)), Theme.AccentText, Ux.C);   // lightning bolt
                         TextRenderer.DrawText(g, d.Name, fSideDev, new Rectangle(x + S(24), y, w - S(24) - pw - bolt - S(3), S(22)), Theme.Text, left | TextFormatFlags.NoPadding);
                         var track = new RectangleF(x + S(24), y + S(26), w - S(24), S(5));
-                        Theme.Fill(g, track, Color.FromArgb(58, 58, 58), S(2.5f));
+                        Theme.Fill(g, track, Theme.Bar, S(2.5f));
                         float fw = Math.Max(S(5), track.Width * d.Percent / 100f);
                         Theme.Fill(g, new RectangleF(track.X, track.Y, fw, track.Height), c, S(2.5f));
                         y += S(SideMenu.DevRow);
                     }
                 }
                 if (side.DividerY >= 0)
-                    using (var pen = new Pen(Color.FromArgb(48, 48, 48), Math.Max(1, s))) g.DrawLine(pen, x, side.DividerY, x + w, side.DividerY);
+                    using (var pen = new Pen(Theme.SideLine, Math.Max(1, s))) g.DrawLine(pen, x, side.DividerY, x + w, side.DividerY);
 
                 if (side.RefillTop >= 0 && refill != null)
                 {
@@ -1084,8 +1097,8 @@ namespace Minibar
 
                 // the update card
                 var card = new Rectangle(S(12), side.CardTop, NavW - S(24), side.CardHeight);
-                Theme.Fill(g, card, Color.FromArgb(34, 34, 34), S(8));
-                Theme.Stroke(g, card, Color.FromArgb(50, 50, 50), S(8), Math.Max(1, s));
+                Theme.Fill(g, card, Theme.SideCard, S(8));
+                Theme.Stroke(g, card, Theme.SideEdge, S(8), Math.Max(1, s));
                 int ready = ReadyCount();
                 bool ever = st.LastCheck != DateTime.MinValue;
                 string title = SideMenu.UpdateTitle(ready, checking, UpdatesBusy, ever);
@@ -1105,7 +1118,7 @@ namespace Minibar
             float d = S(20), wd = n > 9 ? S(26) : d;
             var r = new RectangleF(navItem.Right - S(10) - wd, navItem.Y + (navItem.Height - d) / 2f, wd, d);
             Theme.Fill(g, r, Theme.Accent, d / 2f);
-            TextRenderer.DrawText(g, t, fSideHead, Rectangle.Round(r), Color.FromArgb(20, 20, 20), Ux.C);
+            TextRenderer.DrawText(g, t, fSideHead, Rectangle.Round(r), Theme.Ink, Ux.C);
         }
 
         // Update all: every app with an update, the usual way (a running app closes and reopens, Pour waits for its downloads),
@@ -1178,8 +1191,8 @@ namespace Minibar
             for (int i = 0; i < pages.Length; i++)
             {
                 var r = NavItem(i);
-                if (i == page) Theme.Fill(g, r, Theme.Card, S(6));
-                else if (i == hoverNav) Theme.Fill(g, r, Color.FromArgb(36, 36, 36), S(6));
+                if (i == page) { Theme.Fill(g, r, Theme.Card, S(6)); if (Theme.Hairline != Color.Empty) Theme.Stroke(g, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), Theme.Hairline, S(6), Math.Max(1, s)); }
+                else if (i == hoverNav) Theme.Fill(g, r, Theme.NavHover, S(6));
                 if (i == page) Theme.Fill(g, new Rectangle(r.X, r.Y + S(9), S(3), r.Height - S(18)), Theme.Accent, S(1.5f));
                 Color nc = i == page ? Theme.Text : Theme.Sub;
                 TextRenderer.DrawText(g, navGlyphs[i], fNavIcon, new Rectangle(r.X + S(14), r.Y, S(20), r.Height), nc, Ux.C);
@@ -1207,6 +1220,35 @@ namespace Minibar
         }
 
         static void RefreshAll(Control c) { c.Invalidate(); foreach (Control k in c.Controls) RefreshAll(k); }
+
+        // ------------------------------------------------------------ theme: Dark / OLED / Light, switched live
+        Segmented themePick;
+
+        public void ApplyTheme(ThemeMode m)
+        {
+            try
+            {
+                var before = Theme.P;
+                var accentBefore = Theme.AccentText;
+                Theme.SetMode(m);
+                if (themePick != null) themePick.Index = (int)m;
+                if (before != Theme.P) Recolour(this, before, accentBefore);
+                foreach (var b in new Control[] { undoBtn, pauseBtn, updateAllBtn }) if (b != null) b.BackColor = Theme.Nav;   // side menu buttons sit on the nav
+                if (IsHandleCreated) Theme.ApplyTitleBar(Handle);
+                Ux.Retheme();
+                sideSig = null;
+                RefreshAll(this);
+                Update();
+            }
+            catch (Exception ex) { Log.Crash(ex); }
+        }
+
+        static void Recolour(Control c, Palette from, Color accentBefore)
+        {
+            c.BackColor = Theme.Remap(c.BackColor, from, accentBefore);
+            c.ForeColor = Theme.Remap(c.ForeColor, from, accentBefore);
+            foreach (Control k in c.Controls) Recolour(k, from, accentBefore);
+        }
 
         // for the offscreen layout check
         public void ShowPageForTest(int i) => ShowPage(i);

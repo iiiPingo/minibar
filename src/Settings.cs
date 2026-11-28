@@ -16,6 +16,7 @@ namespace Minibar
         public static string FilePath => Path.Combine(Dir, "settings.ini");
 
         public string Accent = "";                       // empty = honey
+        public string Theme = "dark";                   // theme=dark | oled | light
         public Rectangle Window = Rectangle.Empty;       // negative w/h = maximized
         public bool MinimizeToTray = false;              // tray=1: minimizing hides the window to a tray icon
         public bool CheckUpdates = true;                 // checkupdates=0 turns the GitHub check off
@@ -48,6 +49,7 @@ namespace Minibar
                     if (eq <= 0) continue;
                     string k = line.Substring(0, eq).Trim(), v = line.Substring(eq + 1).Trim();
                     if (k.Equals("accent", StringComparison.OrdinalIgnoreCase)) s.Accent = v;
+                    else if (k.Equals("theme", StringComparison.OrdinalIgnoreCase)) s.Theme = Minibar.Theme.ModeName(Minibar.Theme.ParseMode(v));
                     else if (k.Equals("window", StringComparison.OrdinalIgnoreCase))
                     {
                         var p = v.Split(',').Select(x => int.TryParse(x.Trim(), out int n) ? n : int.MinValue).ToArray();
@@ -72,7 +74,7 @@ namespace Minibar
         // after a restore: take over what was read from the restored file
         public void CopyFrom(Settings o)
         {
-            Accent = o.Accent; MinimizeToTray = o.MinimizeToTray; CheckUpdates = o.CheckUpdates; StartMenu = o.StartMenu;
+            Accent = o.Accent; Theme = o.Theme; MinimizeToTray = o.MinimizeToTray; CheckUpdates = o.CheckUpdates; StartMenu = o.StartMenu;
             AutoUpdate.Clear(); foreach (var a in o.AutoUpdate) AutoUpdate.Add(a);
             Located.Clear(); foreach (var kv in o.Located) Located[kv.Key] = kv.Value;
             RunCmd.Clear(); foreach (var kv in o.RunCmd) RunCmd[kv.Key] = kv.Value;
@@ -90,6 +92,7 @@ namespace Minibar
                 var sb = new StringBuilder();
                 sb.AppendLine("# Minibar settings (safe to edit while Minibar is closed)");
                 sb.AppendLine("accent=" + Accent);
+                sb.AppendLine("theme=" + Theme);
                 if (!Window.IsEmpty) sb.AppendLine("window=" + Window.X + "," + Window.Y + "," + Window.Width + "," + Window.Height);
                 sb.AppendLine("tray=" + (MinimizeToTray ? "1" : "0"));
                 sb.AppendLine("checkupdates=" + (CheckUpdates ? "1" : "0"));
