@@ -44,7 +44,7 @@ namespace Minibar
         public const int MaxDevices = 4, LowAt = 20;
 
         // ------------------------------------------------------------ sizes (unscaled px; multiplied by the DPI scale)
-        public const int NavItemsBottom = 186;      // 3 nav items: 70 + 2*40 + 36
+        public const int NavItemsBottom = 226;      // 4 nav items: 70 + 3*40 + 36
         public const int GapTop = 14, GapBottom = 12;
         public const int DevHeader = 22, DevRow = 38, Divider = 14;
         public const int RefillH = 86;              // header 22, line 2+22, gap 8, buttons 32

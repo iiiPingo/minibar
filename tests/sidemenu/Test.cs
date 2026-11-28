@@ -39,6 +39,7 @@ static class SideTest
                 Console.WriteLine("Minibar side menu tests in " + home);
                 Logic();
                 V200();
+                Displays();
                 Window();
                 Console.WriteLine();
                 Console.WriteLine(fail == 0 ? "ALL " + pass + " PASSED" : fail + " FAILED, " + pass + " passed");
@@ -73,6 +74,120 @@ static class SideTest
         var s = Settings.Load();
         Apps.Locate(a, s, old);
         Ok(a.Exe == null || !Apps.IsOldCopy(a.Exe), "Locate ignores a running .old path", a.Exe ?? "");
+    }
+
+    // ---------------------------------------------------------------- 2.1.0: Displays page (read-only: brightness is never changed here)
+    static List<DisplayInfo> FakeDisplays() => new List<DisplayInfo>
+    {
+        new DisplayInfo { Key = @"\\.\DISPLAY2", Name = "DELL S2721DGF", Primary = true, Connection = "DisplayPort", Width = 2560, Height = 1440, Hz = 165, Scale = 100, State = BrightState.Ok, Brightness = 62 },
+        new DisplayInfo { Key = @"\\.\DISPLAY1", Name = "Built-in display", Internal = true, Connection = "Built-in", Width = 1920, Height = 1200, Hz = 60, Scale = 150, State = BrightState.Ok, Brightness = 35 },
+        new DisplayInfo { Key = @"\\.\DISPLAY3", Name = "LG TV SSCR2 with a really long model name that runs on", Connection = "HDMI", Width = 3840, Height = 2160, Hz = 120, Scale = 300, State = BrightState.Unavailable, Why = "DDC/CI" },
+        new DisplayInfo { Key = @"\\.\DISPLAY4", Name = "Display 4", Width = 1280, Height = 1024, Hz = 75, Scale = 125, State = BrightState.Reading },
+    };
+
+    static void Displays()
+    {
+        // scale
+        Ok(DisplayMath.ScalePercent(96) == 100 && DisplayMath.ScalePercent(120) == 125 && DisplayMath.ScalePercent(144) == 150 && DisplayMath.ScalePercent(168) == 175 && DisplayMath.ScalePercent(192) == 200,
+            "scale: 96/120/144/168/192 dpi = 100/125/150/175/200%");
+        Ok(DisplayMath.ScalePercent(0) == 100 && DisplayMath.ScalePercent(288) == 300, "scale: 0 dpi reads as 100%, 288 = 300%");
+        // clamping and raw ranges
+        Ok(DisplayMath.Clamp(-5) == 0 && DisplayMath.Clamp(150) == 100 && DisplayMath.Clamp(42) == 42, "brightness clamped to 0-100");
+        Ok(DisplayMath.ToRaw(50, 0, 100) == 50 && DisplayMath.ToRaw(100, 0, 255) == 255 && DisplayMath.ToRaw(50, 0, 255) == 128 && DisplayMath.ToRaw(-20, 0, 100) == 0 && DisplayMath.ToRaw(300, 10, 50) == 50,
+            "percent -> monitor range (0-100, 0-255, 10-50), out of range clamped");
+        Ok(DisplayMath.ToPercent(128, 0, 255) == 50 && DisplayMath.ToPercent(5, 10, 50) == 0 && DisplayMath.ToPercent(70, 10, 50) == 100 && DisplayMath.ToPercent(30, 10, 50) == 50,
+            "monitor range -> percent, readings outside the range clamped");
+        Ok(DisplayMath.ToRaw(40, 5, 5) == 5 && DisplayMath.ToPercent(7, 9, 3) == 0, "a broken range (max <= min) never divides by zero");
+        bool round = true; for (int p = 0; p <= 100; p++) if (DisplayMath.ToPercent(DisplayMath.ToRaw(p, 0, 100), 0, 100) != p) round = false;
+        Ok(round, "0-100 range: every percent round-trips");
+        // refresh rate
+        Ok(DisplayMath.Hz(165, 0, 0) == 165 && DisplayMath.Hz(1, 143981, 1000) == 144 && DisplayMath.Hz(0, 0, 0) == 0 && DisplayMath.Hz(0, 60, 0) == 0, "Hz: dmDisplayFrequency, else the path's exact rate rounded");
+        // names and kinds
+        Ok(DisplayMath.NameFor("DELL S2721DGF", false, 1) == "DELL S2721DGF" && DisplayMath.NameFor("", true, 1) == "Built-in display" && DisplayMath.NameFor("Generic PnP Monitor", false, 2) == "Display 2" && DisplayMath.NameFor(null, false, 3) == "Display 3",
+            "names: the monitor's own, never 'Generic PnP Monitor'");
+        Ok(DisplayMath.IsInternal(11) && DisplayMath.IsInternal(6) && DisplayMath.IsInternal(unchecked((int)0x80000000)) && !DisplayMath.IsInternal(5) && !DisplayMath.IsInternal(10),
+            "eDP / LVDS / internal = built-in; HDMI / DisplayPort = external");
+        Ok(DisplayMath.Connection(5) == "HDMI" && DisplayMath.Connection(10) == "DisplayPort" && DisplayMath.Connection(11) == "Built-in" && DisplayMath.Connection(-1) == null, "connection names");
+        Ok(DisplayMath.Resolution(new DisplayInfo { Width = 2560, Height = 1440 }) == "2560 \u00D7 1440" && DisplayMath.Rate(new DisplayInfo { Hz = 180 }) == "180 Hz" && DisplayMath.ScaleText(new DisplayInfo { Scale = 150 }) == "150%",
+            "card text: '2560 × 1440', '180 Hz', '150%'");
+        // order: primary first, then left to right
+        var ord = DisplayMath.Order(new[] {
+            new DisplayInfo { Key = "a", Bounds = new Rectangle(-1920, 0, 1920, 1080) },
+            new DisplayInfo { Key = "b", Bounds = new Rectangle(2560, 0, 1920, 1080) },
+            new DisplayInfo { Key = "p", Primary = true, Bounds = new Rectangle(0, 0, 2560, 1440) } });
+        Ok(string.Join("", ord.Select(d => d.Key)) == "pab", "order: Primary first, then left to right", string.Join("", ord.Select(d => d.Key)));
+        // WMI instance <-> display path
+        Ok(Brightness.Matches(@"DISPLAY\BOE0A1B\4&2a7f1c0&0&UID8388688_0", @"\\?\DISPLAY#BOE0A1B#4&2a7f1c0&0&UID8388688#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}")
+            && !Brightness.Matches(@"DISPLAY\AUO1234\4&1&0&UID1_0", @"\\?\DISPLAY#BOE0A1B#4&2a7f1c0&0&UID8388688#{x}") && !Brightness.Matches(null, "x") && !Brightness.Matches("x", "nohash"),
+            "WMI brightness instance matched to its display");
+
+        // slider rate limit: first value at once, then one per 70 ms, the last value always lands
+        var co = new Coalescer();
+        var sent = new List<int>();
+        void Send(int? v) { if (v != null) sent.Add(v.Value); }
+        Send(co.Push(10, 0));
+        for (int t = 5; t <= 60; t += 5) Send(co.Push(10 + t, t));          // a fast drag inside one interval
+        Ok(sent.SequenceEqual(new[] { 10 }) && co.HasPending, "drag: the first value goes at once, the rest wait", string.Join(",", sent));
+        Send(co.Tick(65));
+        Ok(sent.Count == 1, "nothing more before 70 ms");
+        Send(co.Tick(70));
+        Ok(sent.SequenceEqual(new[] { 10, 70 }) && !co.HasPending, "at 70 ms the newest value (70) goes, older ones are skipped", string.Join(",", sent));
+        Send(co.Push(80, 90));
+        Send(co.Flush(95));
+        Ok(sent.Last() == 80 && !co.HasPending, "mouse-up: the final value goes at once, even inside the interval", string.Join(",", sent));
+        Send(co.Push(80, 300)); Send(co.Flush(301));
+        Ok(sent.Count == 3, "the same value twice isn't sent again");
+        Send(co.Push(140, 400));
+        Ok(sent.Last() == 100, "values are clamped before they go", string.Join(",", sent));
+        co.Reset(); Send(co.Push(100, 401));
+        Ok(sent.Last() == 100 && sent.Count == 5, "after a fresh reading the same value may go again");
+        Send(co.Flush(500));
+        Ok(sent.Count == 5 && co.Flush(600) == null, "flush with nothing waiting sends nothing");
+
+        // the list: drag sends through Changed, rate-limited, final on release
+        using (var dl = new DisplayList(1f) { Size = new Size(640, 600) })
+        {
+            var got = new List<int>();
+            dl.Changed += (d, v) => got.Add(v);
+            var list = FakeDisplays();
+            dl.SetDisplays(list);
+            var d0 = dl.Displays[0];
+            dl.DragForTest(d0, 63, false); dl.DragForTest(d0, 64, false); dl.DragForTest(d0, 65, false); dl.DragForTest(d0, 71, true);
+            Ok(got.First() == 63 && got.Last() == 71 && got.Count <= 3 && d0.Brightness == 71, "slider: first and final values sent, middle ones coalesced", string.Join(",", got));
+            dl.SetBrightness(d0.Key, 20, null);
+            Ok(d0.Brightness == 20 && d0.State == BrightState.Ok, "a fresh reading shows on the slider");
+            dl.SetBrightness(d0.Key, -1, "DDC/CI");
+            Ok(d0.State == BrightState.Unavailable && d0.Why == "DDC/CI", "no answer: 'Brightness unavailable (DDC/CI)'");
+            dl.SetBrightness("\\\\.\\NOPE", 50, null);
+            Ok(true, "a reading for an unplugged display is ignored");
+            var again = FakeDisplays(); again[1].Brightness = -1; again[1].State = BrightState.Reading;
+            dl.SetDisplays(again);
+            Ok(dl.Displays[1].Brightness == 35, "refresh keeps the last value on screen until the new reading arrives");
+            using (var bmp = new Bitmap(640, 600)) dl.DrawToBitmap(bmp, new Rectangle(0, 0, 640, 600));
+            Ok(true, "draws every state without throwing");
+        }
+
+        // this PC's real screens, read only (Windows only)
+        if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+        {
+            List<DisplayNative.Found> real = null; Exception err = null;
+            try { real = DisplayNative.Scan(); } catch (Exception ex) { err = ex; }
+            Ok(err == null && real != null && real.Count >= 1, "this PC: at least one display found", err?.Message ?? "");
+            if (real != null && real.Count > 0)
+            {
+                Ok(real[0].Info.Primary || !real.Any(f => f.Info.Primary), "this PC: Primary is first");
+                Ok(real.All(f => f.Info.Width > 0 && f.Info.Height > 0 && f.Info.Scale >= 100 && f.Info.Hz > 0), "this PC: resolution, scale and Hz read for every display");
+                Ok(real.All(f => f.Info.Name.Length > 0 && f.Info.Name != "Generic PnP Monitor"), "this PC: real names");
+                foreach (var f in real)
+                {
+                    int m; var sw = System.Diagnostics.Stopwatch.StartNew();
+                    int pct = f.Info.Internal ? Brightness.WmiRead(f.DevicePath, out _) : Brightness.DdcRead(f.HMonitor, out m);
+                    Console.WriteLine("        " + f.Info.Key + "  " + f.Info.Name + "  " + DisplayMath.Resolution(f.Info) + "  " + f.Info.Scale + "%  " + f.Info.Hz + " Hz  "
+                        + (f.Info.Internal ? "built-in" : "external") + (f.Info.Connection != null ? " " + f.Info.Connection : "") + (f.Info.Primary ? "  primary" : "")
+                        + "  brightness " + (pct < 0 ? "unavailable" : pct + "%") + " (" + sw.ElapsedMilliseconds + " ms)");
+                }
+            }
+        }
     }
 
     // ---------------------------------------------------------------- plain logic
@@ -142,7 +257,7 @@ static class SideTest
         // layout: nothing overlaps at any height or DPI, the update card always shows, Devices gives way first
         bool allOk = true; string why = "";
         foreach (float sc in new[] { 1f, 1.25f, 1.5f, 2f })
-            for (int h = 520; h <= 1100; h += 7)
+            for (int h = 560; h <= 1100; h += 7)
                 for (int n = 0; n <= 6; n++)
                     foreach (bool rf in new[] { false, true })
                         foreach (bool btn in new[] { false, true })
@@ -154,13 +269,13 @@ static class SideTest
                             if (e != null) { allOk = false; why = "s=" + sc + " h=" + h + " n=" + n + " refill=" + rf + " btn=" + btn + ": " + e; }
                         }
         Ok(allOk, "no block overlaps another, the nav or the version at any height from the smallest window up (DPI 100-200%)", why);
-        var small = SideMenu.Arrange(520, 1, 4, true, true);
+        var small = SideMenu.Arrange(560, 1, 4, true, true);   // 560 = the smallest window since the Displays nav item
         Ok(small.RefillTop >= 0 && small.DevicesShown >= 1 && small.DevicesShown < 4, "smallest window, everything on: Refill stays, Devices shrinks (" + small.DevicesShown + " shown)");
         var tall = SideMenu.Arrange(900, 1, 6, true, true);
         Ok(tall.DevicesShown == 4, "tall window: up to 4 devices");
         var mid = SideMenu.Arrange(660, 1, 4, true, true);
         Ok(mid.DevicesShown >= 1, "default window size: " + mid.DevicesShown + " devices beside Refill and the update card");
-        var noRefill = SideMenu.Arrange(520, 1, 4, false, true);
+        var noRefill = SideMenu.Arrange(560, 1, 4, false, true);
         Ok(noRefill.RefillTop < 0 && noRefill.DevicesShown > small.DevicesShown, "without Refill the devices get its room");
         var none = SideMenu.Arrange(660, 1, 0, false, false);
         Ok(none.DevicesTop < 0 && none.RefillTop < 0 && none.DividerY < 0, "nothing to show: only the card");
@@ -433,6 +548,12 @@ static class SideTest
         var pour = w.AppsForTest.First(a => a.Def.Name == "Pour"); pour.Queued = true;
         Shot("6-side-updating-charging-long-name", normalH);
         pour.Queued = false;
+        // the Displays page with made-up screens: brightness set, built-in, DDC/CI unavailable, still reading
+        w.ShowPageForTest(2);
+        w.SetDisplaysForTest(FakeDisplays());
+        Shot("7-displays", normalH, true);
+        Shot("8-displays-smallest", minH, true);
+        w.ShowPageForTest(0);
         w.Dispose();
         SideMenu.RunningHook = null; SideMenu.RefillPathHook = null;
         Console.WriteLine("Pictures in " + outDir);

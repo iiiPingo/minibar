@@ -24,6 +24,7 @@
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
     <Compile Include="Test.cs" />
     <Compile Include="..\..\src\*.cs" />
     <EmbeddedResource Include="..\..\src\fonts\Lexend-Medium.ttf" LogicalName="fonts.Lexend-Medium.ttf" />

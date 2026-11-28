@@ -1,6 +1,22 @@
-MINIBAR 2.0.0
+MINIBAR 2.1.0
 Home for your drink apps: Echoa, Fizz, Juice, Pour, Pulp and Refill in one window.
 
+NEW IN 2.1.0: Displays
+- A new Displays page (left menu, or Ctrl+3) with one card per screen, the main
+  screen first: its real name (like "Odyssey G50SF", not "Generic PnP Monitor"),
+  resolution, Windows scale (100%, 150%...) and refresh rate.
+- A brightness slider on every card. A laptop screen uses Windows' own brightness;
+  an external monitor is set over its cable (DDC/CI). Drag it, use the mouse wheel
+  over it, or click the card and use the arrow keys.
+- No slider on a monitor? It says "Brightness unavailable (DDC/CI)": turn on DDC/CI
+  in that monitor's own on-screen menu, then press Refresh. Some TVs, docks and HDR
+  modes don't allow it at all. Its other details still show.
+- Plugging a screen in or out, or changing its resolution, refresh rate or scale,
+  updates the cards by themselves. Refresh (or F5) reads everything again, including
+  brightness you changed with the monitor's buttons.
+- Nothing about screens is read until you open the page, and Minibar never changes
+  brightness on its own.
+- Keys: Ctrl+1 Apps, Ctrl+2 Updates, Ctrl+3 Displays, Ctrl+4 Settings.
 NEW IN 2.0.0: Refill joins
 - Refill (download sorter) is the 6th app, right below Pour. Install, Start, Stop,
   Open, Start with Windows, updates, backups and the Start menu shortcut all work for
@@ -98,7 +114,7 @@ Downloads\<App> (or loose in Downloads, like "Pulp (2).exe"). Backups folders an
 Refresh (or F5) looks again.
 
 KEYBOARD
-F5 refresh  ·  Ctrl+1 Apps  ·  Ctrl+2 Updates  ·  Ctrl+3 Settings  ·  Esc close
+F5 refresh  ·  Ctrl+1 Apps  ·  Ctrl+2 Updates  ·  Ctrl+3 Displays  ·  Ctrl+4 Settings  ·  Esc close
 
 SETTINGS
 Accent colour (the family swatches, or your own), Minimize to tray, Check for

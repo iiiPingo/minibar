@@ -18,10 +18,17 @@ namespace Minibar
         readonly Settings st;
         readonly List<AppInfo> apps = Catalog.All.Select(d => new AppInfo(d)).ToList();
         readonly float s;
-        readonly string[] pages = { "Apps", "Updates", "Settings" };
+        readonly string[] pages = { "Apps", "Updates", "Displays", "Settings" };
         readonly List<Panel> pagePanels = new List<Panel>();
         readonly Font fBody, fSmall, fTitle, fNav, fH2, fNavIcon;
-        readonly string[] navGlyphs = { Theme.GApps, "\uE895", Theme.GSettings };   // Sync
+        readonly string[] navGlyphs = { Theme.GApps, "\uE895", "\uE7F4", Theme.GSettings };   // Sync, TVMonitor
+        const int DisplaysPage = 2;
+        DisplayService dsvc;
+        DisplayList dlist;
+        Label dispSub;
+        int dispGen;
+        bool dispStale = true;
+        Timer dispDebounce;
         readonly AppInfo self = new AppInfo(Catalog.Minibar);
         UpdateList ulist;
         Label updSub;
@@ -80,6 +87,7 @@ namespace Minibar
             self.Version = Apps.VersionText(self.Exe) ?? Application.ProductVersion;
             BuildApps();
             BuildUpdates();
+            BuildDisplays();
             BuildSettings();
             BuildSide();
             ShowPage(0);
@@ -112,6 +120,8 @@ namespace Minibar
 
         protected override void WndProc(ref Message m)
         {
+            // a screen plugged in or out, or its resolution / refresh rate / scale changed: update the Displays cards (bursts come together)
+            if (m.Msg == 0x007E /* WM_DISPLAYCHANGE */ || m.Msg == 0x001A /* WM_SETTINGCHANGE */ || m.Msg == 0x02E0 /* WM_DPICHANGED */) DisplaysChanged();
             if (m.Msg == Native.WM_SHOWMINIBAR && Native.WM_SHOWMINIBAR != 0)
             {
                 // Minibar was opened again: bring this window up instead
@@ -140,6 +150,7 @@ namespace Minibar
             var fizz = apps.FirstOrDefault(a => a.Def.Name == "Fizz");
             if (fizz != null && fizz.Found) Apps.CheckFizz(fizz);
             Rescan();
+            if (page == DisplaysPage) RefreshDisplays();   // brightness may have changed with the monitor's buttons or Fn keys
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -147,13 +158,13 @@ namespace Minibar
             base.OnKeyDown(e);
             if (e.KeyCode == Keys.Escape) { Close(); e.Handled = true; }
             else if (e.KeyCode == Keys.F5) { LookAgain(); e.Handled = true; }
-            else if (e.Control && e.KeyCode >= Keys.D1 && e.KeyCode <= Keys.D3) { ShowPage(e.KeyCode - Keys.D1); e.Handled = true; }
+            else if (e.Control && e.KeyCode >= Keys.D1 && e.KeyCode <= Keys.D4) { ShowPage(e.KeyCode - Keys.D1); e.Handled = true; }
         }
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            MinimumSize = SizeFromClientSize(new Size(S(780), S(520)));
+            MinimumSize = SizeFromClientSize(new Size(S(780), S(560)));   // 560: room for the 4th nav item above the side blocks
             var r = st.Window;
             if (r.IsEmpty) return;
             bool max = r.Width < 0;
@@ -181,6 +192,8 @@ namespace Minibar
                 return;
             }
             timer?.Stop();
+            dispDebounce?.Stop();
+            dsvc?.Dispose();
             if (tray != null) { tray.Visible = false; tray.Dispose(); tray = null; }
             var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
             st.Window = WindowState == FormWindowState.Maximized ? new Rectangle(b.Location, new Size(-b.Width, -b.Height)) : b;
@@ -261,6 +274,58 @@ namespace Minibar
             var again = new FlatBtn("Refresh", s) { Location = new Point(p.Width - S(112) - S(12), S(6)), Width = S(112), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             again.Click += (o, e) => LookAgain();
             p.Controls.Add(again);
+        }
+
+        // ------------------------------------------------------------ Displays: monitor info + brightness (nothing runs until the page is opened)
+        void BuildDisplays()
+        {
+            var p = NewPage("Displays", "", out dispSub);
+            dlist = new DisplayList(s) { Location = new Point(0, S(70)), Size = new Size(p.Width, p.Height - S(70)), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+            p.Controls.Add(dlist);
+            var again = new FlatBtn("Refresh", s) { Location = new Point(p.Width - S(112) - S(12), S(6)), Width = S(112), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            again.Click += (o, e) => RefreshDisplays();
+            p.Controls.Add(again);
+
+            dsvc = new DisplayService(Ui);
+            dsvc.Scanned += (g, list) =>
+            {
+                if (g != dispGen) return;   // an older refresh
+                dlist.SetDisplays(list);
+                DisplaysSub();
+            };
+            dsvc.BrightnessRead += (g, key, pct, why) => { if (g == dispGen) { dlist.SetBrightness(key, pct, why); DisplaysSub(); } };
+            dsvc.WriteFailed += key => { dlist.MarkFailed(key); DisplaysSub(); };
+            dlist.Changed += (d, pct) => dsvc.Set(d.Key, pct);
+
+            dispDebounce = new Timer { Interval = 450 };
+            dispDebounce.Tick += (o, e) =>
+            {
+                dispDebounce.Stop();
+                if (page == DisplaysPage && Visible && WindowState != FormWindowState.Minimized) RefreshDisplays(); else dispStale = true;
+            };
+        }
+
+        void RefreshDisplays()
+        {
+            if (dsvc == null) return;
+            dispStale = false;
+            dispGen = dsvc.Refresh();
+            DisplaysSub();
+        }
+
+        void DisplaysChanged()
+        {
+            if (dispDebounce == null) return;
+            dispDebounce.Stop();
+            dispDebounce.Start();
+        }
+
+        void DisplaysSub()
+        {
+            if (dispSub == null) return;
+            var all = dlist.Displays;
+            if (all.Count == 0) { dispSub.Text = dlist.Loading ? "Looking for displays…" : "No displays found"; return; }
+            dispSub.Text = all.Count + (all.Count == 1 ? " display" : " displays") + "  ·  brightness changes apply right away";
         }
 
         void BuildSettings()
@@ -754,6 +819,7 @@ namespace Minibar
             foreach (var a in apps) Apps.Locate(a, st, null);
             Rescan();
             QueryTasks();
+            if (page == DisplaysPage) RefreshDisplays(); else dispStale = true;
         }
 
         // Fizz starts through a scheduled task; asking schtasks takes a moment, so it runs in the background
@@ -1089,6 +1155,7 @@ namespace Minibar
             page = i;
             for (int k = 0; k < pagePanels.Count; k++) pagePanels[k].Visible = k == i;
             if (i == 1) { RefreshBackups(); UpdateCheckedText(); }
+            if (i == DisplaysPage && dispStale) RefreshDisplays();
             Invalidate();
         }
 
@@ -1148,6 +1215,9 @@ namespace Minibar
         }
 
         public AppList ListForTest => list;
+        public DisplayList DisplaysForTest => dlist;
+        // made-up displays for the renders: results from the real scan are ignored from now on
+        public void SetDisplaysForTest(List<DisplayInfo> list) { dispGen = -1; dispStale = false; dlist.SetDisplays(list); DisplaysSub(); }
         public AppInfo SelfForTest => self;
         public UpdateList UpdatesForTest => ulist;
     }

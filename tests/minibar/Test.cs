@@ -245,11 +245,11 @@ static class Test
         int normal = w.ClientSize.Width, narrow = w.MinimumSize.Width - (w.Width - w.ClientSize.Width);
         Shot("1-apps", 0, normal);
         Shot("2-updates", 1, normal);
-        Shot("3-settings", 2, normal);
+        Shot("3-settings", 3, normal);
         Cards("4-cards", w.ListForTest.Width);
         Shot("5-apps-narrow", 0, narrow);
         Shot("6-updates-narrow", 1, narrow);
-        Shot("7-settings-narrow", 2, narrow);
+        Shot("7-settings-narrow", 3, narrow);
         Cards("8-cards-narrow", w.ListForTest.Width);
         fizz.PawnIO = true; fizz.Error = null;
         Cards("9-cards-pawnio-installed", w.ListForTest.Width);

@@ -8,6 +8,7 @@ One window for the drink apps: **Echoa**, **Fizz**, **Juice**, **Pour** and **Pu
 - Back up and restore every app's settings in one zip.
 - Install button: anything not on this PC installs from GitHub in one click (so new users only need Minibar).
 - Fizz notice: what Fizz needs installed (PawnIO) and the anti-cheat note, with download links.
+- Displays page (new in 2.1.0): every screen's real name, resolution, scale and refresh rate, with a brightness slider (WMI for a laptop screen, DDC/CI for external monitors).
 - Side menu (new in 1.9.0): device batteries from Juice, Refill's last move with Undo and Pause, an update card with Update all, and a count on the Updates tab.
 
 ## Install
