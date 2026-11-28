@@ -105,7 +105,7 @@ namespace Minibar
                 int cap, border;
                 switch (Mode)
                 {
-                    case ThemeMode.Oled: cap = 0x000000; border = 0x000000; break;
+                    case ThemeMode.Oled: cap = 0x000000; border = ColorRef(Hairline); break;   // black caption, #1F1F24 outline (like Discord)
                     case ThemeMode.Light: cap = 0x00F3F3F3; border = 0x00E0E0E0; break;
                     default: cap = ColorRef(darkCaption ?? Nav); border = unchecked((int)0xFFFFFFFF); break;   // Dark: as before, system border
                 }

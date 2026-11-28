@@ -1186,6 +1186,13 @@ namespace Minibar
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
             g.Clear(Theme.Bg);
             using (var b = new SolidBrush(Theme.Nav)) g.FillRectangle(b, 0, 0, NavW, ClientSize.Height);
+            // OLED / Light: the title bar is the same colour as the window, so a hairline marks where it ends
+            if (Theme.Hairline != Color.Empty)
+            {
+                g.SmoothingMode = SmoothingMode.None;   // a crisp 1px line, not two half-tone rows
+                using (var b = new SolidBrush(Theme.Hairline)) g.FillRectangle(b, 0, 0, ClientSize.Width, Math.Max(1, S(1)));
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+            }
             Theme.DrawLogo(g, new RectangleF(S(18), S(20), S(30), S(30)));
             TextRenderer.DrawText(g, "Minibar", fLogoText, new Rectangle(S(56), S(18), S(116), S(34)), Theme.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             for (int i = 0; i < pages.Length; i++)

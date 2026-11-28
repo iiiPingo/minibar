@@ -545,8 +545,8 @@ static class SideTest
             float s = Scale(w);
             int S(float v) => (int)Math.Round(v * s);
             Point navPt = new Point(S(172), S(6)), pagePt = new Point(w.ClientSize.Width - S(20), S(10));
-            Color dNav, dPage;
-            using (var bmp = Snap(w)) { dNav = bmp.GetPixel(navPt.X, navPt.Y); dPage = bmp.GetPixel(pagePt.X, pagePt.Y); }
+            Color dNav, dPage, dTopNav, dTopPage;
+            using (var bmp = Snap(w)) { dNav = bmp.GetPixel(navPt.X, navPt.Y); dPage = bmp.GetPixel(pagePt.X, pagePt.Y); dTopNav = bmp.GetPixel(navPt.X, 0); dTopPage = bmp.GetPixel(pagePt.X, 0); }
             Ok(Near(dNav, Palette.Dark.Nav) && Near(dPage, Palette.Dark.Bg), "starts Dark", dNav + " " + dPage);
 
             var pick = All(w).OfType<Segmented>().FirstOrDefault();
@@ -566,6 +566,9 @@ static class SideTest
             Application.DoEvents();
             using (var bmp = Snap(w))
                 Ok(bmp.GetPixel(navPt.X, navPt.Y).ToArgb() == Color.Black.ToArgb() && bmp.GetPixel(pagePt.X, pagePt.Y).ToArgb() == Color.Black.ToArgb(), "OLED: pure black on screen");
+            using (var bmp = Snap(w))
+                Ok(Near(bmp.GetPixel(navPt.X, 0), Palette.Oled.Hairline, 0) && Near(bmp.GetPixel(pagePt.X, 0), Palette.Oled.Hairline, 0),
+                   "OLED: a hairline under the title bar, across the whole window");
             Ok(File.ReadAllText(Settings.FilePath).Contains("theme=oled"), "theme=oled saved");
             var side = w.SideButtonsForTest.ToList();
             Ok(side.All(b => b.BackColor.ToArgb() == Color.Black.ToArgb()), "side menu buttons follow the side menu");
@@ -573,7 +576,8 @@ static class SideTest
             typeof(Segmented).GetMethod("Pick", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(pick, new object[] { 0 });
             Application.DoEvents();
             using (var bmp = Snap(w))
-                Ok(Near(bmp.GetPixel(navPt.X, navPt.Y), dNav, 0) && Near(bmp.GetPixel(pagePt.X, pagePt.Y), dPage, 0), "back to Dark: exactly as before");
+                Ok(Near(bmp.GetPixel(navPt.X, navPt.Y), dNav, 0) && Near(bmp.GetPixel(pagePt.X, pagePt.Y), dPage, 0)
+                   && Near(bmp.GetPixel(navPt.X, 0), dTopNav, 0) && Near(bmp.GetPixel(pagePt.X, 0), dTopPage, 0), "back to Dark: exactly as before (no hairline)");
             Ok(side.All(b => b.BackColor.ToArgb() == Palette.Dark.Nav.ToArgb()), "side buttons back on the dark side menu");
             foreach (int pg in new[] { 0, 1, 2, 3 })
                 foreach (var m in new[] { ThemeMode.Light, ThemeMode.Oled, ThemeMode.Dark })
