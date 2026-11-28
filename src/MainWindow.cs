@@ -285,6 +285,13 @@ namespace Minibar
             var again = new FlatBtn("Refresh", s) { Location = new Point(p.Width - S(112) - S(12), S(6)), Width = S(112), Anchor = AnchorStyles.Top | AnchorStyles.Right };
             again.Click += (o, e) => RefreshDisplays();
             p.Controls.Add(again);
+            var winSet = new FlatBtn("Display settings", s) { Location = new Point(p.Width - S(112) - S(12) - S(8) - S(150), S(6)), Width = S(150), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            winSet.Click += (o, e) =>
+            {
+                try { Process.Start(new ProcessStartInfo("ms-settings:display") { UseShellExecute = true })?.Dispose(); }
+                catch (Exception ex) { Log.Crash(ex); }
+            };
+            p.Controls.Add(winSet);
 
             dsvc = new DisplayService(Ui);
             dsvc.Scanned += (g, list) =>

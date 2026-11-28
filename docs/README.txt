@@ -13,7 +13,8 @@ NEW IN 2.1.0: Displays
   modes don't allow it at all. Its other details still show.
 - Plugging a screen in or out, or changing its resolution, refresh rate or scale,
   updates the cards by themselves. Refresh (or F5) reads everything again, including
-  brightness you changed with the monitor's buttons.
+  brightness you changed with the monitor's buttons. Display settings opens Windows'
+  own display page (to change resolution, scale or layout).
 - Nothing about screens is read until you open the page, and Minibar never changes
   brightness on its own.
 - Keys: Ctrl+1 Apps, Ctrl+2 Updates, Ctrl+3 Displays, Ctrl+4 Settings.
